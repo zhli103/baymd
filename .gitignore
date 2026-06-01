@@ -1,0 +1,34 @@
+# ===== Maven =====
+target/
+!.mvn/wrapper/maven-wrapper.jar
+*.jar
+*.war
+*.ear
+
+# ===== IDE =====
+.idea/
+*.iml
+.project
+.classpath
+.settings/
+.vscode/
+*.swp
+*.swo
+*~
+
+# ===== OS =====
+.DS_Store
+Thumbs.db
+
+# ===== Logs =====
+logs/
+*.log
+
+# ===== Env / Secrets =====
+.env
+*.env.local
+application-local.yaml
+application-local.yml
+
+# ===== Maven Wrapper =====
+.mvn/wrapper/maven-wrapper.properties
