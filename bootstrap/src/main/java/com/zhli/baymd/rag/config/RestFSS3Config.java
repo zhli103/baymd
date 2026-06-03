@@ -18,6 +18,7 @@
 package com.zhli.baymd.rag.config;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
@@ -31,9 +32,11 @@ import java.net.URI;
 
 /**
  * RustFS S3 客户端配置类
- * 用于配置和初始化与 RustFS 对象存储服务交互的 S3 客户端
+ * 用于配置和初始化与 RustFS 对象存储服务交互的 S3 客户端。
+ * 仅当 {@code rustfs.url} 配置存在时生效。
  */
 @Configuration
+@ConditionalOnProperty("rustfs.url")
 public class RestFSS3Config {
 
     @Bean

@@ -104,10 +104,16 @@ public class RAGConstant {
     public static final String CONVERSATION_TITLE_PROMPT_PATH = "prompt/conversation-title.st";
 
     /**
-     * 默认 RAG 问答提示词模板路径
+     * 通用企业 RAG 问答提示词模板路径（保留用于参考）
      * 用于指导大模型基于检索到的文档内容进行准确回答，包含严格的事实性约束和链接处理规则
      */
     public static final String RAG_ENTERPRISE_PROMPT_PATH = "prompt/answer-chat-kb.st";
+
+    /**
+     * 医学健康 KB 问答提示词模板路径
+     * 包含医学安全护栏、紧急情况识别、科室推荐规则等医学领域专用逻辑
+     */
+    public static final String MEDICAL_KB_PROMPT_PATH = "prompt/answer-chat-medical-kb.st";
 
     /**
      * MCP 工具参数提取提示词模板路径

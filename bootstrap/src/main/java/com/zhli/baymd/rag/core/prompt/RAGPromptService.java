@@ -37,7 +37,7 @@ import java.util.stream.IntStream;
 import static com.zhli.baymd.rag.constant.RAGConstant.CONTEXT_FORMAT_PATH;
 import static com.zhli.baymd.rag.constant.RAGConstant.MCP_KB_MIXED_PROMPT_PATH;
 import static com.zhli.baymd.rag.constant.RAGConstant.MCP_ONLY_PROMPT_PATH;
-import static com.zhli.baymd.rag.constant.RAGConstant.RAG_ENTERPRISE_PROMPT_PATH;
+import static com.zhli.baymd.rag.constant.RAGConstant.MEDICAL_KB_PROMPT_PATH;
 
 /**
  * RAG Prompt 编排服务
@@ -183,7 +183,7 @@ public class RAGPromptService {
 
     private String defaultTemplate(PromptScene scene) {
         return switch (scene) {
-            case KB_ONLY -> templateLoader.load(RAG_ENTERPRISE_PROMPT_PATH);
+            case KB_ONLY -> templateLoader.load(MEDICAL_KB_PROMPT_PATH);
             case MCP_ONLY -> templateLoader.load(MCP_ONLY_PROMPT_PATH);
             case MIXED -> templateLoader.load(MCP_KB_MIXED_PROMPT_PATH);
             case EMPTY -> "";
