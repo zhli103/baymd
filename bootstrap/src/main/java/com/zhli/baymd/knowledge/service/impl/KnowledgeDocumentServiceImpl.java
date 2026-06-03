@@ -297,6 +297,9 @@ public class KnowledgeDocumentServiceImpl implements KnowledgeDocumentService {
      */
     private ChunkProcessResult runChunkProcess(KnowledgeDocumentDO documentDO) {
         ChunkingMode chunkingMode = ChunkingMode.fromValue(documentDO.getChunkStrategy());
+        if (chunkingMode == null) {
+            chunkingMode = ChunkingMode.FIXED_SIZE;
+        }
         KnowledgeBaseDO kbDO = knowledgeBaseMapper.selectById(documentDO.getKbId());
         String embeddingModel = kbDO.getEmbeddingModel();
         ChunkingOptions config = buildChunkingOptions(chunkingMode, documentDO);

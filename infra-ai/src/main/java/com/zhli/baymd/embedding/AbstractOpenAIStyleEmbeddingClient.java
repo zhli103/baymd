@@ -112,7 +112,10 @@ public abstract class AbstractOpenAIStyleEmbeddingClient implements EmbeddingCli
             inputArray.add(text);
         }
         body.add("input", inputArray);
-        body.addProperty("dimensions", target.candidate().getDimension());
+        Integer dimensions = target.candidate().getDimension();
+        if (dimensions != null && dimensions > 0) {
+            body.addProperty("dimensions", dimensions);
+        }
         customizeRequestBody(body, target);
 
         Request.Builder requestBuilder = new Request.Builder()
