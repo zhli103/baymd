@@ -17,6 +17,12 @@
 
 package com.zhli.baymd.rag.config;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.zhli.baymd.knowledge.dao.entity.KnowledgeBaseDO;
+import com.zhli.baymd.knowledge.dao.mapper.KnowledgeBaseMapper;
+import com.zhli.baymd.rag.dao.entity.IntentNodeDO;
+import com.zhli.baymd.rag.dao.mapper.IntentNodeMapper;
 import com.zhli.baymd.ingestion.service.IntentTreeService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,7 +33,7 @@ import org.springframework.stereotype.Component;
  * 医学意图树启动初始化器
  * <p>
  * 应用启动时自动检查意图树是否已初始化，若未初始化则从 {@code IntentTreeFactory} 构建医学意图树并写入数据库。
- * 可通过 {@code app.medical.intent-tree.auto-init} 配置项控制是否启用（默认启用）。
+ * 同时将新节点的 kbId 修正为数据库中实际存在的医学科知识库 ID。
  * </p>
  */
 @Slf4j
@@ -35,18 +41,19 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class MedicalIntentTreeInitializer implements CommandLineRunner {
 
-    private final IntentTreeService intentTreeService;
+    private static final String PLACEHOLDER_KB_ID = "9100000000000000001";
 
-    /**
-     * 是否启用自动初始化（可通过配置覆盖）
-     */
+    private final IntentTreeService intentTreeService;
+    private final IntentNodeMapper intentNodeMapper;
+    private final KnowledgeBaseMapper knowledgeBaseMapper;
+
     @org.springframework.beans.factory.annotation.Value("${app.medical.intent-tree.auto-init:true}")
     private boolean autoInit;
 
     @Override
     public void run(String... args) {
         if (!autoInit) {
-            log.info("医学意图树自动初始化已禁用（app.medical.intent-tree.auto-init=false）");
+            log.info("医学意图树自动初始化已禁用");
             return;
         }
 
@@ -55,10 +62,42 @@ public class MedicalIntentTreeInitializer implements CommandLineRunner {
             if (created > 0) {
                 log.info("医学意图树初始化完成，新增 {} 个节点", created);
             } else {
-                log.info("医学意图树已存在，跳过初始化");
+                log.info("医学意图树无新增节点");
             }
+            fixPlaceholderKbIds();
         } catch (Exception e) {
-            log.error("医学意图树初始化失败，可稍后通过 API 手动初始化", e);
+            log.error("医学意图树初始化失败", e);
+        }
+    }
+
+    /**
+     * 将工厂占位 KB ID 修正为数据库中实际存在的医学科知识库 ID
+     */
+    private void fixPlaceholderKbIds() {
+        // 查找真实KB
+        KnowledgeBaseDO realKb = knowledgeBaseMapper.selectList(
+                new LambdaQueryWrapper<KnowledgeBaseDO>()
+                        .eq(KnowledgeBaseDO::getDeleted, 0)
+                        .isNotNull(KnowledgeBaseDO::getId)
+                        .last("LIMIT 1")
+        ).stream().findFirst().orElse(null);
+
+        if (realKb == null) {
+            log.debug("无可用知识库，跳过 kbId 修正");
+            return;
+        }
+
+        // 更新占位 KB ID
+        int updated = intentNodeMapper.update(
+                null,
+                new LambdaUpdateWrapper<IntentNodeDO>()
+                        .eq(IntentNodeDO::getKbId, PLACEHOLDER_KB_ID)
+                        .eq(IntentNodeDO::getDeleted, 0)
+                        .set(IntentNodeDO::getKbId, realKb.getId())
+                        .set(IntentNodeDO::getCollectionName, realKb.getCollectionName())
+        );
+        if (updated > 0) {
+            log.info("已将 {} 个意图节点的 kbId 从占位 {} 修正为 {}", updated, PLACEHOLDER_KB_ID, realKb.getId());
         }
     }
 }

@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>医学问答助手</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background: #f5f5f5; }
+.header { text-align: center; margin-bottom: 18px; }
+.header h1 { color: #2c7a7b; font-size: 24px; }
+.quick-questions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; justify-content: center; }
+.quick-questions button { padding: 6px 14px; background: #e8f5f5; border: 1px solid #b2dfdb; border-radius: 16px; cursor: pointer; font-size: 13px; color: #00695c; white-space: nowrap; }
+.quick-questions button:hover { background: #b2dfdb; }
+.chat-box { background: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); overflow: hidden; }
+.messages { height: 500px; overflow-y: auto; padding: 20px; }
+.messages .msg { margin-bottom: 14px; line-height: 1.6; animation: fadeIn .3s; }
+@keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+.messages .user { text-align: right; }
+.messages .user span { background: #e3f2fd; padding: 8px 14px; border-radius: 14px; display: inline-block; max-width: 80%; text-align: left; }
+.messages .assistant .content { background: #fafafa; padding: 12px 16px; border-radius: 8px; display: inline-block; max-width: 95%; border-left: 3px solid #2c7a7b; white-space: pre-wrap; word-break: break-word; }
+.input-bar { display: flex; border-top: 1px solid #eee; padding: 12px; gap: 10px; }
+.input-bar input { flex: 1; padding: 10px 14px; border: 1px solid #ddd; border-radius: 8px; font-size: 15px; outline: none; }
+.input-bar input:focus { border-color: #2c7a7b; }
+.input-bar button { padding: 10px 24px; background: #2c7a7b; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 15px; }
+.input-bar button:disabled { background: #ccc; cursor: not-allowed; }
+.status { font-size: 12px; color: #999; padding: 6px 16px; }
+.loading::after { content: '▋'; animation: blink 1s infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+</style>
+</head>
+<body>
+
+<div class="header"><h1>医学问答助手</h1></div>
+
+<div class="quick-questions">
+  <button onclick="ask('头疼应该挂什么科')">头疼</button>
+  <button onclick="ask('胃不舒服看哪个科室')">胃不舒服</button>
+  <button onclick="ask('皮肤起红疹去哪个科')">皮肤红疹</button>
+  <button onclick="ask('腰疼腿麻挂什么科')">腰疼腿麻</button>
+  <button onclick="ask('小孩发烧去哪个科')">小孩发烧</button>
+  <button onclick="ask('月经不调挂什么科')">月经不调</button>
+  <button onclick="ask('心慌心悸去哪个科')">心慌心悸</button>
+  <button onclick="ask('咳嗽胸闷看什么科')">咳嗽胸闷</button>
+  <button onclick="ask('脚扭伤了挂什么科')">脚扭伤</button>
+  <button onclick="ask('耳鸣听力下降去哪个科')">耳鸣</button>
+</div>
+
+<div class="chat-box">
+  <div class="messages" id="messages">
+    <div class="msg assistant"><div class="content">你好！我是智能健康助手。点击上方快捷问题或输入症状，帮你推荐合适科室。</div></div>
+  </div>
+  <div class="input-bar">
+    <input id="question" placeholder="输入症状，如：头疼应该挂什么科？" onkeydown="if(event.key==='Enter')ask()">
+    <button id="sendBtn" onclick="ask()">发送</button>
+  </div>
+  <div class="status" id="status">就绪</div>
+</div>
+
+<script>
+function ask(questionText) {
+  const q = questionText || document.getElementById('question').value.trim();
+  if (!q) return;
+
+  const msgs = document.getElementById('messages');
+
+  const userDiv = document.createElement('div');
+  userDiv.className = 'msg user';
+  userDiv.innerHTML = `<span>${q}</span>`;
+  msgs.appendChild(userDiv);
+  document.getElementById('question').value = '';
+
+  const aiDiv = document.createElement('div');
+  aiDiv.className = 'msg assistant';
+  const contentDiv = document.createElement('div');
+  contentDiv.className = 'content loading';
+  aiDiv.appendChild(contentDiv);
+  msgs.appendChild(aiDiv);
+  msgs.scrollTop = msgs.scrollHeight;
+
+  const btn = document.getElementById('sendBtn');
+  btn.disabled = true;
+  document.getElementById('status').textContent = '思考中...';
+
+  fetch(`/api/baymd/rag/v3/chat?question=${encodeURIComponent(q)}`)
+    .then(response => {
+      if (!response.ok) throw new Error('HTTP ' + response.status);
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let currentData = '';
+
+      function processEvent(data) {
+        if (!data || data === '[DONE]') return;
+        try {
+          const json = JSON.parse(data);
+          // content 字段优先（response类型），兼容 delta 格式
+          if (json.content) contentDiv.textContent += json.content;
+          else if (json.delta) contentDiv.textContent += json.delta;
+          else if (json.message) contentDiv.textContent = json.message;
+        } catch(e) {
+          if (!data.startsWith('{')) contentDiv.textContent += data;
+        }
+      }
+
+      function read() {
+        reader.read().then(({ done, value }) => {
+          if (done) {
+            processEvent(currentData.trim());
+            contentDiv.classList.remove('loading');
+            btn.disabled = false;
+            document.getElementById('status').textContent = '完成';
+            if (!contentDiv.textContent.trim()) {
+              contentDiv.textContent = '未检索到相关内容。';
+            }
+            return;
+          }
+          buffer += decoder.decode(value, { stream: true });
+          // SSE 事件以空行分隔
+          while (buffer.includes('\n\n')) {
+            const idx = buffer.indexOf('\n\n');
+            const block = buffer.substring(0, idx);
+            buffer = buffer.substring(idx + 2);
+            // 从 block 中提取 data: 行
+            for (const line of block.split('\n')) {
+              if (line.startsWith('data:')) {
+                currentData += line.substring(5).trim();
+              }
+            }
+            processEvent(currentData.trim());
+            if (currentData.trim()) {
+              contentDiv.classList.remove('loading');
+              msgs.scrollTop = msgs.scrollHeight;
+            }
+            currentData = '';
+          }
+          read();
+        }).catch(err => {
+          contentDiv.textContent = '读取中断: ' + err.message;
+          btn.disabled = false;
+        });
+      }
+      read();
+    })
+    .catch(err => {
+      contentDiv.textContent = '请求失败: ' + err.message;
+      contentDiv.classList.remove('loading');
+      btn.disabled = false;
+      document.getElementById('status').textContent = '错误';
+    });
+}
+</script>
+</body>
+</html>

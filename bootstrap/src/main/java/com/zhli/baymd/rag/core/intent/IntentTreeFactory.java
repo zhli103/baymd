@@ -39,7 +39,7 @@ public class IntentTreeFactory {
     /**
      * 医学科知识库 ID（需与数据库中 t_knowledge_base.id 一致）
      */
-    private static final String KB_ID_MEDICAL = "9100000000000000001";
+    private static final String KB_ID_MEDICAL = "2062148529471643648";
 
     /**
      * 构建医学健康意图树
@@ -135,7 +135,86 @@ public class IntentTreeFactory {
                 .build();
 
         deptRecommend.setChildren(List.of(deptInternal, deptSurgery, deptSkin, deptObgynPed));
-        medical.setChildren(List.of(deptRecommend));
+
+        // ---------- 1.2 症状自查 ----------
+        IntentNode symptomCheck = IntentNode.builder()
+                .id("medical-symptom")
+                .kbId(KB_ID_MEDICAL)
+                .name("症状自查")
+                .level(CATEGORY)
+                .parentId(medical.getId())
+                .kind(IntentKind.KB)
+                .description("根据用户描述的症状，分析可能的原因、严重程度评估及就医建议")
+                .examples(List.of(
+                        "头晕乏力是什么原因？",
+                        "胸口闷疼是怎么回事？",
+                        "肚子疼拉稀可能是什么病？",
+                        "反复发烧是什么原因？"
+                ))
+                .build();
+
+        IntentNode symptomInternal = IntentNode.builder()
+                .id("medical-symptom-internal")
+                .kbId(KB_ID_MEDICAL)
+                .name("内科症状自查")
+                .level(TOPIC)
+                .parentId(symptomCheck.getId())
+                .kind(IntentKind.KB)
+                .description("发热、咳嗽、头痛、头晕、胸闷、心悸、腹痛、腹泻、恶心呕吐、乏力、失眠等内科常见症状的病因分析及就医建议")
+                .examples(List.of(
+                        "反复低烧是什么毛病？",
+                        "头晕乏力没精神怎么回事？",
+                        "胃疼拉肚子可能是什么病？"
+                ))
+                .build();
+
+        IntentNode symptomSurgery = IntentNode.builder()
+                .id("medical-symptom-surgery")
+                .kbId(KB_ID_MEDICAL)
+                .name("外科症状自查")
+                .level(TOPIC)
+                .parentId(symptomCheck.getId())
+                .kind(IntentKind.KB)
+                .description("急性腹痛、外伤肿痛、腰腿疼痛、关节肿胀、颈部肿块等外科常见症状的可能病因分析")
+                .examples(List.of(
+                        "腰疼是什么原因引起的？",
+                        "膝盖肿了疼是什么问题？",
+                        "脖子摸到肿块可能是什么？"
+                ))
+                .build();
+
+        IntentNode symptomSkin = IntentNode.builder()
+                .id("medical-symptom-skin")
+                .kbId(KB_ID_MEDICAL)
+                .name("皮肤与五官症状自查")
+                .level(TOPIC)
+                .parentId(symptomCheck.getId())
+                .kind(IntentKind.KB)
+                .description("皮疹、瘙痒、红肿、脱发、口腔溃疡、视力模糊、耳鸣、鼻塞流涕等皮肤五官症状的可能病因分析")
+                .examples(List.of(
+                        "全身起红疹很痒是什么原因？",
+                        "突然耳鸣怎么回事？",
+                        "嘴巴里反复长溃疡是什么病？"
+                ))
+                .build();
+
+        IntentNode symptomEmergency = IntentNode.builder()
+                .id("medical-symptom-emergency")
+                .kbId(KB_ID_MEDICAL)
+                .name("急症识别")
+                .level(TOPIC)
+                .parentId(symptomCheck.getId())
+                .kind(IntentKind.KB)
+                .description("突发剧烈头痛、胸痛伴呼吸困难、大出血、意识丧失、急性中毒等需要紧急就医的危重症状识别")
+                .examples(List.of(
+                        "突然剧烈头痛是不是中风？",
+                        "胸口剧痛出冷汗是什么问题？",
+                        "突然看不清听不见是什么急症？"
+                ))
+                .build();
+
+        symptomCheck.setChildren(List.of(symptomInternal, symptomSurgery, symptomSkin, symptomEmergency));
+        medical.setChildren(List.of(deptRecommend, symptomCheck));
         roots.add(medical);
 
         // ========== 2. 系统交互 ==========
