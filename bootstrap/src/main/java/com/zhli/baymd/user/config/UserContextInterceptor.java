@@ -69,8 +69,32 @@ public class UserContextInterceptor implements HandlerInterceptor {
             return true;
         }
 
-        String loginId = StpUtil.getLoginIdAsString();
+        String loginId = null;
+        try {
+            loginId = StpUtil.getLoginIdAsString();
+        } catch (Exception ignored) {
+            // 未登录时获取 loginId 会抛异常
+        }
+        if (StrUtil.isBlank(loginId)) {
+            // 未登录，设置默认系统用户
+            UserContext.set(LoginUser.builder()
+                    .userId("1")
+                    .username("system")
+                    .role("admin")
+                    .avatar(DEFAULT_AVATAR_URL)
+                    .build());
+            return true;
+        }
         UserDO user = userMapper.selectById(loginId);
+        if (user == null) {
+            UserContext.set(LoginUser.builder()
+                    .userId("1")
+                    .username("system")
+                    .role("admin")
+                    .avatar(DEFAULT_AVATAR_URL)
+                    .build());
+            return true;
+        }
 
         UserContext.set(
                 LoginUser.builder()

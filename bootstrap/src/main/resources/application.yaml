@@ -1,5 +1,6 @@
 server:
   port: 9090
+  address: 0.0.0.0
   servlet:
     context-path: /api/baymd
 
@@ -135,31 +136,13 @@ ai:
     message-chunk-size: 1
 
   chat:
-    default-model: qwen3.5-4B
-    deep-thinking-model: qwen3.5-4B
+    default-model: qwen2.5-7b
+    deep-thinking-model: qwen2.5-7b
     candidates:
-#      - id: qwen-plus
-#        provider: bailian
-#        model: qwen-plus-latest
-#        priority: 1
-#      - id: qwen3-local
-#        provider: ollama
-#        model: qwen3:8b-fp16
-#        priority: 2
-#      - id: qwen3-max
-#        provider: bailian
-#        model: qwen3-max
-#        supports-thinking: true
-#        priority: 3
-      - id: qwen3.5-4B
+      - id: qwen2.5-7b
         provider: siliconflow
-        model: Qwen/Qwen3.5-4B
-        supports-thinking: true
-        priority: 4
-#      - id: gpt-5-mini
-#        provider: aihubmix
-#        model: gpt-5-mini
-#        priority: 5
+        model: Qwen/Qwen2.5-7B-Instruct
+        priority: 1
 
   embedding:
     default-model: bge
@@ -186,14 +169,10 @@ ai:
         provider: siliconflow
         model: BAAI/bge-reranker-v2-m3
         priority: 1
-#      - id: qwen3-rerank
-#        provider: bailian
-#        model: qwen3-rerank
-#        priority: 1
-#      - id: rerank-noop
-#        provider: noop
-#        model: noop
-#        priority: 100
+      - id: rerank-noop
+        provider: noop
+        model: noop
+        priority: 100
 
 rustfs:
   url: http://localhost:9000
