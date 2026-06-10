@@ -214,7 +214,119 @@ public class IntentTreeFactory {
                 .build();
 
         symptomCheck.setChildren(List.of(symptomInternal, symptomSurgery, symptomSkin, symptomEmergency));
-        medical.setChildren(List.of(deptRecommend, symptomCheck));
+
+        // ---------- 1.3 药物查询 ----------
+        IntentNode drugQuery = IntentNode.builder()
+                .id("medical-drug")
+                .kbId(KB_ID_MEDICAL)
+                .name("药物查询")
+                .level(CATEGORY)
+                .parentId(medical.getId())
+                .kind(IntentKind.KB)
+                .description("查询药品的功效、用法用量、不良反应、禁忌症、注意事项等药物信息")
+                .examples(List.of(
+                        "布洛芬有什么副作用？",
+                        "阿莫西林怎么吃？",
+                        "高血压药有什么注意事项？"
+                ))
+                .build();
+
+        IntentNode drugWestern = IntentNode.builder()
+                .id("medical-drug-western")
+                .kbId(KB_ID_MEDICAL)
+                .name("西药查询")
+                .level(TOPIC)
+                .parentId(drugQuery.getId())
+                .kind(IntentKind.KB)
+                .description("感冒药、退烧药、止痛药、抗生素、降压药、降糖药等西药的功效、用法、不良反应、禁忌及相互作用")
+                .examples(List.of(
+                        "布洛芬一天吃几次？",
+                        "阿莫西林和头孢有什么区别？",
+                        "降压药需要长期吃吗？"
+                ))
+                .build();
+
+        IntentNode drugChinese = IntentNode.builder()
+                .id("medical-drug-chinese")
+                .kbId(KB_ID_MEDICAL)
+                .name("中药与中成药")
+                .level(TOPIC)
+                .parentId(drugQuery.getId())
+                .kind(IntentKind.KB)
+                .description("板蓝根、连花清瘟、六味地黄丸、逍遥丸等中成药和中药的功效、用法及注意事项")
+                .examples(List.of(
+                        "板蓝根治什么？",
+                        "六味地黄丸有什么功效？",
+                        "连花清瘟怎么吃？"
+                ))
+                .build();
+
+        drugQuery.setChildren(List.of(drugWestern, drugChinese));
+
+        // ---------- 1.4 饮食建议 ----------
+        IntentNode dietAdvice = IntentNode.builder()
+                .id("medical-diet")
+                .kbId(KB_ID_MEDICAL)
+                .name("饮食建议")
+                .level(CATEGORY)
+                .parentId(medical.getId())
+                .kind(IntentKind.KB)
+                .description("根据健康状况提供针对性的饮食调理建议，包括宜食、忌食、食疗方案等")
+                .examples(List.of(
+                        "高血压吃什么好？",
+                        "糖尿病人不能吃什么？",
+                        "胃炎吃什么食物养胃？"
+                ))
+                .build();
+
+        IntentNode dietChronic = IntentNode.builder()
+                .id("medical-diet-chronic")
+                .kbId(KB_ID_MEDICAL)
+                .name("慢病饮食")
+                .level(TOPIC)
+                .parentId(dietAdvice.getId())
+                .kind(IntentKind.KB)
+                .description("高血压、高血脂、糖尿病、痛风、肾病等慢性疾病的饮食原则和食谱建议")
+                .examples(List.of(
+                        "高血压饮食要注意什么？",
+                        "痛风不能吃什么？",
+                        "糖尿病人水果能吃吗？"
+                ))
+                .build();
+
+        IntentNode dietDigest = IntentNode.builder()
+                .id("medical-diet-digest")
+                .kbId(KB_ID_MEDICAL)
+                .name("消化调理")
+                .level(TOPIC)
+                .parentId(dietAdvice.getId())
+                .kind(IntentKind.KB)
+                .description("胃炎、胃溃疡、便秘、腹泻、消化不良等消化系统问题的饮食调理方案")
+                .examples(List.of(
+                        "胃炎吃什么食物养胃？",
+                        "便秘吃什么能通便？",
+                        "胃酸过多不能吃什么？"
+                ))
+                .build();
+
+        IntentNode dietGeneral = IntentNode.builder()
+                .id("medical-diet-general")
+                .kbId(KB_ID_MEDICAL)
+                .name("日常营养")
+                .level(TOPIC)
+                .parentId(dietAdvice.getId())
+                .kind(IntentKind.KB)
+                .description("免疫力提升、减肥、孕期营养、儿童营养、老年人饮食等日常饮食建议")
+                .examples(List.of(
+                        "吃什么能提高免疫力？",
+                        "孕妇不能吃什么？",
+                        "减肥期间怎么吃？"
+                ))
+                .build();
+
+        dietAdvice.setChildren(List.of(dietChronic, dietDigest, dietGeneral));
+
+        medical.setChildren(List.of(deptRecommend, symptomCheck, drugQuery, dietAdvice));
         roots.add(medical);
 
         // ========== 2. 系统交互 ==========
