@@ -326,7 +326,198 @@ public class IntentTreeFactory {
 
         dietAdvice.setChildren(List.of(dietChronic, dietDigest, dietGeneral));
 
-        medical.setChildren(List.of(deptRecommend, symptomCheck, drugQuery, dietAdvice));
+        // ---------- 1.5 中医辨证 ----------
+        IntentNode tcmDiagnosis = IntentNode.builder()
+                .id("medical-tcm")
+                .kbId(KB_ID_MEDICAL)
+                .name("中医辨证")
+                .level(CATEGORY)
+                .parentId(medical.getId())
+                .kind(IntentKind.KB)
+                .description("从中医角度对症状进行辨证分析，包括八纲辨证、脏腑辨证、气血津液辨证等，给出中医调理建议")
+                .examples(List.of(
+                        "中医怎么看失眠？",
+                        "手脚冰凉是什么虚？",
+                        "老是上火怎么回事？",
+                        "面色发黄、乏力中医怎么说？"
+                ))
+                .build();
+
+        IntentNode tcmConstitution = IntentNode.builder()
+                .id("medical-tcm-constitution")
+                .kbId(KB_ID_MEDICAL)
+                .name("体质辨识")
+                .level(TOPIC)
+                .parentId(tcmDiagnosis.getId())
+                .kind(IntentKind.KB)
+                .description("平和质、气虚质、阳虚质、阴虚质、痰湿质、湿热质、血瘀质、气郁质、特禀质九种体质的辨识特征及调养方法")
+                .examples(List.of(
+                        "怎么判断自己是什么体质？",
+                        "手脚冰凉虚是什么体质？",
+                        "总是上火是阴虚吗？"
+                ))
+                .build();
+
+        IntentNode tcmSymptom = IntentNode.builder()
+                .id("medical-tcm-symptom")
+                .kbId(KB_ID_MEDICAL)
+                .name("常见症状辨证")
+                .level(TOPIC)
+                .parentId(tcmDiagnosis.getId())
+                .kind(IntentKind.KB)
+                .description("失眠、乏力、头晕、口干口苦、便秘、月经不调等常见症状的中医辨证分型、病因病机和调理建议")
+                .examples(List.of(
+                        "中医怎么看失眠多梦？",
+                        "老是口干口苦是什么原因？",
+                        "便秘中医怎么调理？"
+                ))
+                .build();
+
+        IntentNode tcmDiet = IntentNode.builder()
+                .id("medical-tcm-diet")
+                .kbId(KB_ID_MEDICAL)
+                .name("中医食疗")
+                .level(TOPIC)
+                .parentId(tcmDiagnosis.getId())
+                .kind(IntentKind.KB)
+                .description("药食同源原则、四季食疗、体质食疗、常见药膳推荐等中医饮食调理知识")
+                .examples(List.of(
+                        "冬天吃什么补身体？",
+                        "气虚体质吃什么好？",
+                        "湿气重要吃什么？"
+                ))
+                .build();
+
+        tcmDiagnosis.setChildren(List.of(tcmConstitution, tcmSymptom, tcmDiet));
+
+        // ---------- 1.6 报告解读 ----------
+        IntentNode reportInterp = IntentNode.builder()
+                .id("medical-report")
+                .kbId(KB_ID_MEDICAL)
+                .name("报告解读")
+                .level(CATEGORY)
+                .parentId(medical.getId())
+                .kind(IntentKind.KB)
+                .description("分析解读体检报告中的各项指标，包括血常规、肝功能、肾功能、血脂、血糖、尿常规等，提醒异常指标和潜在健康风险")
+                .examples(List.of(
+                        "帮我看一下这个体检报告",
+                        "转氨酶升高是什么意思？",
+                        "血脂报告怎么看？",
+                        "尿酸偏高是什么问题？"
+                ))
+                .build();
+
+        IntentNode reportBlood = IntentNode.builder()
+                .id("medical-report-blood")
+                .kbId(KB_ID_MEDICAL)
+                .name("血常规")
+                .level(TOPIC)
+                .parentId(reportInterp.getId())
+                .kind(IntentKind.KB)
+                .description("白细胞、红细胞、血红蛋白、血小板、中性粒细胞等血常规指标的解读和异常分析")
+                .examples(List.of(
+                        "白细胞偏高是什么原因？",
+                        "血红蛋白偏低怎么回事？",
+                        "血小板减少是什么问题？"
+                ))
+                .build();
+
+        IntentNode reportBiochem = IntentNode.builder()
+                .id("medical-report-biochem")
+                .kbId(KB_ID_MEDICAL)
+                .name("生化指标")
+                .level(TOPIC)
+                .parentId(reportInterp.getId())
+                .kind(IntentKind.KB)
+                .description("肝功能（ALT、AST、GGT）、肾功能（肌酐、尿素）、血脂（胆固醇、甘油三酯）、血糖、尿酸等生化指标的解读")
+                .examples(List.of(
+                        "转氨酶升高是什么意思？",
+                        "肌酐偏高怎么回事？",
+                        "总胆固醇高了怎么办？"
+                ))
+                .build();
+
+        IntentNode reportUrine = IntentNode.builder()
+                .id("medical-report-urine")
+                .kbId(KB_ID_MEDICAL)
+                .name("尿常规与其他")
+                .level(TOPIC)
+                .parentId(reportInterp.getId())
+                .kind(IntentKind.KB)
+                .description("尿常规、甲状腺功能、肿瘤标志物、心电图等常见检查项目的指标解读")
+                .examples(List.of(
+                        "尿蛋白阳性什么意思？",
+                        "促甲状腺激素偏高是什么问题？",
+                        "肿瘤标志物升高是癌症吗？"
+                ))
+                .build();
+
+        reportInterp.setChildren(List.of(reportBlood, reportBiochem, reportUrine));
+
+        // ---------- 1.7 医院推荐 ----------
+        IntentNode hospitalRec = IntentNode.builder()
+                .id("medical-hospital")
+                .kbId(KB_ID_MEDICAL)
+                .name("医院推荐")
+                .level(CATEGORY)
+                .parentId(medical.getId())
+                .kind(IntentKind.KB)
+                .description("根据疾病类型、就诊需求帮助用户了解如何选择适合的医院，包括医院等级、专科优势、就诊流程等")
+                .examples(List.of(
+                        "心脏病去什么医院好？",
+                        "三甲医院和二甲医院有什么区别？",
+                        "去大医院看病流程是怎样的？"
+                ))
+                .build();
+
+        IntentNode hospitalLevel = IntentNode.builder()
+                .id("medical-hospital-level")
+                .kbId(KB_ID_MEDICAL)
+                .name("医院等级与选择")
+                .level(TOPIC)
+                .parentId(hospitalRec.getId())
+                .kind(IntentKind.KB)
+                .description("三甲、三乙、二甲等医院等级划分标准，各级医院服务能力说明，以及根据不同病情选择合适等级医院的建议")
+                .examples(List.of(
+                        "三甲医院是什么意思？",
+                        "二甲医院能看什么病？",
+                        "小病去社区医院还是大医院？"
+                ))
+                .build();
+
+        IntentNode hospitalDept = IntentNode.builder()
+                .id("medical-hospital-dept")
+                .kbId(KB_ID_MEDICAL)
+                .name("专科医院推荐")
+                .level(TOPIC)
+                .parentId(hospitalRec.getId())
+                .kind(IntentKind.KB)
+                .description("心血管、肿瘤、骨科、神经、儿科、妇产等各专科领域知名医院及选择建议")
+                .examples(List.of(
+                        "心脏病去哪个医院好？",
+                        "肿瘤治疗哪家医院强？",
+                        "骨科手术去什么医院？"
+                ))
+                .build();
+
+        IntentNode hospitalVisit = IntentNode.builder()
+                .id("medical-hospital-visit")
+                .kbId(KB_ID_MEDICAL)
+                .name("就诊指南")
+                .level(TOPIC)
+                .parentId(hospitalRec.getId())
+                .kind(IntentKind.KB)
+                .description("挂号方式、就诊流程、医保使用、入院准备、异地就医等就医实用指南")
+                .examples(List.of(
+                        "去医院看病要带什么？",
+                        "怎么挂专家号？",
+                        "异地就医医保怎么报销？"
+                ))
+                .build();
+
+        hospitalRec.setChildren(List.of(hospitalLevel, hospitalDept, hospitalVisit));
+
+        medical.setChildren(List.of(deptRecommend, symptomCheck, drugQuery, dietAdvice, tcmDiagnosis, reportInterp, hospitalRec));
         roots.add(medical);
 
         // ========== 2. 系统交互 ==========
