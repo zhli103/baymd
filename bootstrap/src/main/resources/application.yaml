@@ -111,7 +111,7 @@ ai:
 #        embedding: /v1/embeddings
     bailian:
       url: https://dashscope-intl.aliyuncs.com
-      api-key: ${BAILIAN_API_KEY:sk-affdd98318294f04a88f22c67f558875}
+      api-key: ${BAILIAN_API_KEY:}
       endpoints:
         chat: /compatible-mode/v1/chat/completions
         embedding: /compatible-mode/v1/embeddings
