@@ -74,22 +74,14 @@ public class BaiLianRerankClient implements RerankClient {
 
         JsonObject reqBody = new JsonObject();
         reqBody.addProperty("model", HttpResponseHelper.requireModel(target, provider()));
-
-        JsonObject input = new JsonObject();
-        input.addProperty("query", query);
+        reqBody.addProperty("query", query);
 
         JsonArray documentsArray = new JsonArray();
         for (RetrievedChunk each : candidates) {
             documentsArray.add(each.getText() == null ? "" : each.getText());
         }
-        input.add("documents", documentsArray);
-
-        JsonObject parameters = new JsonObject();
-        parameters.addProperty("top_n", topN);
-        parameters.addProperty("return_documents", true);
-
-        reqBody.add("input", input);
-        reqBody.add("parameters", parameters);
+        reqBody.add("documents", documentsArray);
+        reqBody.addProperty("top_n", topN);
 
         Request request = new Request.Builder()
                 .url(ModelUrlResolver.resolveUrl(provider, target.candidate(), ModelCapability.RERANK))
@@ -113,9 +105,10 @@ public class BaiLianRerankClient implements RerankClient {
             throw new ModelClientException(provider() + " rerank 请求失败: " + e.getMessage(), ModelClientErrorType.NETWORK_ERROR, null, e);
         }
 
-        JsonObject output = requireOutput(respJson);
-
-        JsonArray results = output.getAsJsonArray("results");
+        if (!respJson.has("results") || respJson.get("results").isJsonNull()) {
+            throw new ModelClientException(provider() + " rerank 响应缺少 results", ModelClientErrorType.INVALID_RESPONSE, null);
+        }
+        JsonArray results = respJson.getAsJsonArray("results");
         if (CollUtil.isEmpty(results)) {
             throw new ModelClientException(provider() + " rerank results 为空", ModelClientErrorType.INVALID_RESPONSE, null);
         }
@@ -168,14 +161,4 @@ public class BaiLianRerankClient implements RerankClient {
         return reranked;
     }
 
-    private JsonObject requireOutput(JsonObject respJson) {
-        if (respJson == null || !respJson.has("output")) {
-            throw new ModelClientException(provider() + " rerank 响应缺少 output", ModelClientErrorType.INVALID_RESPONSE, null);
-        }
-        JsonObject output = respJson.getAsJsonObject("output");
-        if (output == null || !output.has("results")) {
-            throw new ModelClientException(provider() + " rerank 响应缺少 results", ModelClientErrorType.INVALID_RESPONSE, null);
-        }
-        return output;
-    }
 }

@@ -57,7 +57,7 @@ rag:
 
   rate-limit:
     global:
-      enabled: true
+      enabled: false
       max-concurrent: 1
       max-wait-seconds: 15
       lease-seconds: 30
@@ -109,24 +109,25 @@ ai:
 #      endpoints:
 #        chat: /v1/chat/completions
 #        embedding: /v1/embeddings
-#    bailian:
-#      url: https://dashscope.aliyuncs.com
-#      api-key: ${BAILIAN_API_KEY:}
-#      endpoints:
-#        chat: /compatible-mode/v1/chat/completions
-#        rerank: /api/v1/services/rerank/text-rerank/text-rerank
+    bailian:
+      url: https://dashscope-intl.aliyuncs.com
+      api-key: ${BAILIAN_API_KEY:sk-affdd98318294f04a88f22c67f558875}
+      endpoints:
+        chat: /compatible-mode/v1/chat/completions
+        embedding: /compatible-mode/v1/embeddings
+        rerank: /compatible-api/v1/reranks
 #    aihubmix:
 #      url: https://aihubmix.com
 #      api-key: ${AIHUBMIX_API_KEY:}
 #      endpoints:
 #        chat: /v1/chat/completions
 #        embedding: /v1/embeddings
-    siliconflow:
-      url: https://api.siliconflow.cn
-      api-key: ${SILICONFLOW_API_KEY:}
-      endpoints:
-        chat: /v1/chat/completions
-        embedding: /v1/embeddings
+#    siliconflow:
+#      url: https://api.siliconflow.cn
+#      api-key: ${SILICONFLOW_API_KEY:}
+#      endpoints:
+#        chat: /v1/chat/completions
+#        embedding: /v1/embeddings
 
   selection:
     failure-threshold: 2
@@ -136,20 +137,20 @@ ai:
     message-chunk-size: 1
 
   chat:
-    default-model: qwen2.5-7b
-    deep-thinking-model: qwen2.5-7b
+    default-model: qwen3.5-flash
+    deep-thinking-model: qwen3.5-flash
     candidates:
-      - id: qwen2.5-7b
-        provider: siliconflow
-        model: Qwen/Qwen2.5-7B-Instruct
+      - id: qwen3.5-flash
+        provider: bailian
+        model: qwen3.5-flash
         priority: 1
 
   embedding:
-    default-model: bge
+    default-model: text-embedding-v4
     candidates:
-      - id: bge
-        provider: siliconflow
-        model: BAAI/bge-large-zh-v1.5
+      - id: text-embedding-v4
+        provider: bailian
+        model: text-embedding-v4
         priority: 1
 #      - id: qwen-emb-local
 #        provider: ollama
@@ -163,11 +164,11 @@ ai:
 #        priority: 3
 
   rerank:
-    default-model: bge-rerank
+    default-model: qwen3-rerank
     candidates:
-      - id: bge-rerank
-        provider: siliconflow
-        model: BAAI/bge-reranker-v2-m3
+      - id: qwen3-rerank
+        provider: bailian
+        model: qwen3-rerank
         priority: 1
       - id: rerank-noop
         provider: noop
