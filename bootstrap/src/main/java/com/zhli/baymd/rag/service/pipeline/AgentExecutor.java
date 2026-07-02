@@ -1,5 +1,6 @@
 package com.zhli.baymd.rag.service.pipeline;
 
+import com.zhli.baymd.rag.config.ReActProperties;
 import com.zhli.baymd.rag.core.agent.ReActAgentService;
 import com.zhli.baymd.rag.core.agent.ReActLoop;
 import com.zhli.baymd.rag.core.prompt.PromptTemplateLoader;
@@ -26,6 +27,7 @@ public class AgentExecutor implements ConversationExecutor {
 
     private final ReActAgentService agentService;
     private final PromptTemplateLoader promptTemplateLoader;
+    private final ReActProperties reActProperties;
 
     @Override
     public ExecutionMode getMode() {
@@ -34,12 +36,15 @@ public class AgentExecutor implements ConversationExecutor {
 
     @Override
     public boolean supports(StreamChatContext ctx) {
-        // 目前：深度思考模式启用 Agent，或显式标记
-        // 后续可通过意图分类结果中的特定标记或用户参数来决定
+        // Agent 模式总开关
+        if (!reActProperties.isEnabled()) {
+            return false;
+        }
+        // 深度思考模式 → Agent
         if (ctx.isDeepThinking()) {
             return true;
         }
-        // 如果意图分类中有 MCP 意图（需要外部实时数据），也用 Agent
+        // MCP 意图（需要外部实时数据）→ Agent
         if (ctx.getSubIntents() != null) {
             return ctx.getSubIntents().stream()
                     .flatMap(si -> si.nodeScores().stream())

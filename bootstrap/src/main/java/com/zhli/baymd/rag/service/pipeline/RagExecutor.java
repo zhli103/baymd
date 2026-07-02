@@ -3,8 +3,11 @@ package com.zhli.baymd.rag.service.pipeline;
 import com.zhli.baymd.framework.convention.ChatMessage;
 import com.zhli.baymd.framework.convention.ChatRequest;
 import com.zhli.baymd.infra.chat.LLMService;
+import com.zhli.baymd.infra.chat.StreamCallback;
 import com.zhli.baymd.infra.chat.StreamCancellationHandle;
 import com.zhli.baymd.rag.config.SearchChannelProperties;
+import com.zhli.baymd.rag.core.eval.QualityEvaluator;
+import com.zhli.baymd.rag.core.followup.FollowUpGenerator;
 import com.zhli.baymd.rag.core.intent.IntentResolver;
 import com.zhli.baymd.rag.core.prompt.EvidenceBudgetService;
 import com.zhli.baymd.rag.core.prompt.PromptContext;
@@ -12,6 +15,7 @@ import com.zhli.baymd.rag.core.prompt.RAGPromptService;
 import com.zhli.baymd.rag.core.retrieve.RetrievalEngine;
 import com.zhli.baymd.rag.dto.IntentGroup;
 import com.zhli.baymd.rag.dto.RetrievalContext;
+import com.zhli.baymd.rag.service.handler.EnrichedStreamCallback;
 import com.zhli.baymd.rag.service.handler.StreamTaskManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -34,6 +38,8 @@ public class RagExecutor implements ConversationExecutor {
     private final IntentResolver intentResolver;
     private final EvidenceBudgetService evidenceBudgetService;
     private final StreamTaskManager taskManager;
+    private final FollowUpGenerator followUpGenerator;
+    private final QualityEvaluator qualityEvaluator;
 
     @Override
     public ExecutionMode getMode() {
@@ -99,7 +105,15 @@ public class RagExecutor implements ConversationExecutor {
                 .topP(retrievalCtx.hasMcp() ? 0.8 : 1.0)
                 .build();
 
-        StreamCancellationHandle handle = llmService.streamChat(chatRequest, ctx.getCallback());
+        // 用增强回调包裹：自动收集引用、生成追问、异步评估质量
+        String question = ctx.getRewriteResult() != null
+                ? ctx.getRewriteResult().rewrittenQuestion()
+                : ctx.getQuestion();
+        StreamCallback enriched = new EnrichedStreamCallback(
+                ctx.getCallback(), followUpGenerator, qualityEvaluator,
+                question, retrievalCtx.getIntentChunks());
+
+        StreamCancellationHandle handle = llmService.streamChat(chatRequest, enriched);
         taskManager.bindHandle(ctx.getTaskId(), handle);
     }
 }
