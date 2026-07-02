@@ -1,0 +1,162 @@
+[
+  {
+    "id": "smoke-001",
+    "question": "头疼应该挂什么科",
+    "expectedIntent": "medical/dept_recommend",
+    "expectedIntentKind": "KB",
+    "referencePoints": ["神经内科", "科室", "就诊"],
+    "minAcceptableScore": 3
+  },
+  {
+    "id": "smoke-002",
+    "question": "头晕乏力没精神怎么回事",
+    "expectedIntent": "medical/symptom_check",
+    "expectedIntentKind": "KB",
+    "referencePoints": ["贫血", "低血压", "原因分析"],
+    "minAcceptableScore": 3
+  },
+  {
+    "id": "smoke-003",
+    "question": "布洛芬有什么副作用",
+    "expectedIntent": "medical/drug_query",
+    "expectedIntentKind": "KB",
+    "referencePoints": ["胃肠道", "不良反应", "副作用"],
+    "minAcceptableScore": 3
+  },
+  {
+    "id": "smoke-004",
+    "question": "高血压吃什么好",
+    "expectedIntent": "medical/diet_advice",
+    "expectedIntentKind": "KB",
+    "referencePoints": ["低盐", "蔬菜", "钾", "饮食"],
+    "minAcceptableScore": 3
+  },
+  {
+    "id": "smoke-005",
+    "question": "手脚冰凉是什么虚",
+    "expectedIntent": "medical/tcm_diagnosis",
+    "expectedIntentKind": "KB",
+    "referencePoints": ["阳虚", "气血", "中医"],
+    "minAcceptableScore": 3
+  },
+  {
+    "id": "smoke-006",
+    "question": "转氨酶升高是什么意思",
+    "expectedIntent": "medical/report_interpret",
+    "expectedIntentKind": "KB",
+    "referencePoints": ["肝", "肝功能", "指标"],
+    "minAcceptableScore": 3
+  },
+  {
+    "id": "smoke-007",
+    "question": "心脏病去什么医院好",
+    "expectedIntent": "medical/hospital_recommend",
+    "expectedIntentKind": "KB",
+    "referencePoints": ["三甲", "心内科", "专科"],
+    "minAcceptableScore": 3
+  },
+  {
+    "id": "smoke-008",
+    "question": "感冒了吃什么药好得快",
+    "expectedIntent": "medical/drug_query",
+    "expectedIntentKind": "KB",
+    "referencePoints": ["感冒药", "对症", "休息"],
+    "minAcceptableScore": 3
+  },
+  {
+    "id": "smoke-009",
+    "question": "糖尿病人的三餐怎么安排",
+    "expectedIntent": "medical/diet_advice",
+    "expectedIntentKind": "KB",
+    "referencePoints": ["血糖", "碳水化合物", "蛋白质", "定时定量"],
+    "minAcceptableScore": 3
+  },
+  {
+    "id": "smoke-010",
+    "question": "胃疼怎么办快速缓解",
+    "expectedIntent": "medical/symptom_check",
+    "expectedIntentKind": "KB",
+    "referencePoints": ["胃痛", "缓解", "饮食", "就医"],
+    "minAcceptableScore": 3
+  },
+  {
+    "id": "smoke-011",
+    "question": "孕妇可以吃阿莫西林吗",
+    "expectedIntent": "medical/drug_query",
+    "expectedIntentKind": "KB",
+    "referencePoints": ["孕妇", "抗生素", "安全", "医生"],
+    "minAcceptableScore": 3
+  },
+  {
+    "id": "smoke-012",
+    "question": "尿酸高不能吃什么食物",
+    "expectedIntent": "medical/diet_advice",
+    "expectedIntentKind": "KB",
+    "referencePoints": ["嘌呤", "海鲜", "啤酒", "内脏"],
+    "minAcceptableScore": 3
+  },
+  {
+    "id": "smoke-013",
+    "question": "腰椎间盘突出怎么治疗",
+    "expectedIntent": "medical/symptom_check",
+    "expectedIntentKind": "KB",
+    "referencePoints": ["保守治疗", "手术", "康复", "理疗"],
+    "minAcceptableScore": 3
+  },
+  {
+    "id": "smoke-014",
+    "question": "验血报告怎么看贫血",
+    "expectedIntent": "medical/report_interpret",
+    "expectedIntentKind": "KB",
+    "referencePoints": ["血红蛋白", "红细胞", "指标"],
+    "minAcceptableScore": 3
+  },
+  {
+    "id": "smoke-015",
+    "question": "儿童发烧39度怎么办",
+    "expectedIntent": "medical/symptom_check",
+    "expectedIntentKind": "KB",
+    "referencePoints": ["退烧", "儿童", "就医", "物理降温"],
+    "minAcceptableScore": 3
+  },
+  {
+    "id": "smoke-016",
+    "question": "胃疼",
+    "expectedIntent": "medical/guidance",
+    "expectedIntentKind": "KB",
+    "referencePoints": ["症状", "就医"],
+    "minAcceptableScore": 2
+  },
+  {
+    "id": "smoke-017",
+    "question": "吃什么对肝好",
+    "expectedIntent": "medical/diet_advice",
+    "expectedIntentKind": "KB",
+    "referencePoints": ["肝脏", "饮食", "营养"],
+    "minAcceptableScore": 3
+  },
+  {
+    "id": "smoke-018",
+    "question": "每天喝多少水合适",
+    "expectedIntent": "medical/diet_advice",
+    "expectedIntentKind": "KB",
+    "referencePoints": ["饮水", "毫升", "健康"],
+    "minAcceptableScore": 3
+  },
+  {
+    "id": "smoke-019",
+    "question": "体检报告显示脂肪肝严重吗",
+    "expectedIntent": "medical/report_interpret",
+    "expectedIntentKind": "KB",
+    "referencePoints": ["脂肪肝", "肝功能", "饮食", "运动"],
+    "minAcceptableScore": 3
+  },
+  {
+    "id": "smoke-020",
+    "question": "火星上怎么种土豆",
+    "expectedIntent": "medical/other",
+    "expectedIntentKind": "KB",
+    "referencePoints": ["无法回答", "未收录", "知识库"],
+    "minAcceptableScore": 1
+  }
+]

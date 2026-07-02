@@ -64,6 +64,12 @@ public class PromptContext {
     private Map<String, List<RetrievedChunk>> intentChunks;
 
     /**
+     * 证据预算截断时被省略的文档条数（0 = 未截断）
+     */
+    @Builder.Default
+    private int omittedEvidenceCount = 0;
+
+    /**
      * 是否包含 MCP 上下文
      */
     public boolean hasMcp() {
@@ -75,5 +81,13 @@ public class PromptContext {
      */
     public boolean hasKb() {
         return StrUtil.isNotBlank(kbContext);
+    }
+
+    /**
+     * 获取证据省略说明文本
+     */
+    public String getOmittedEvidenceNote() {
+        if (omittedEvidenceCount <= 0) return "";
+        return String.format("（注：共检索到相关文档，因篇幅限制已省略 %d 条）", omittedEvidenceCount);
     }
 }

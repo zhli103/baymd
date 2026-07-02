@@ -1,0 +1,105 @@
+package com.zhli.baymd.rag.service.pipeline;
+
+import com.zhli.baymd.framework.convention.ChatMessage;
+import com.zhli.baymd.framework.convention.ChatRequest;
+import com.zhli.baymd.infra.chat.LLMService;
+import com.zhli.baymd.infra.chat.StreamCancellationHandle;
+import com.zhli.baymd.rag.config.SearchChannelProperties;
+import com.zhli.baymd.rag.core.intent.IntentResolver;
+import com.zhli.baymd.rag.core.prompt.EvidenceBudgetService;
+import com.zhli.baymd.rag.core.prompt.PromptContext;
+import com.zhli.baymd.rag.core.prompt.RAGPromptService;
+import com.zhli.baymd.rag.core.retrieve.RetrievalEngine;
+import com.zhli.baymd.rag.dto.IntentGroup;
+import com.zhli.baymd.rag.dto.RetrievalContext;
+import com.zhli.baymd.rag.service.handler.StreamTaskManager;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Component;
+
+import java.util.List;
+
+/**
+ * RAG 知识问答执行器 — 检索 + LLM 生成的经典 RAG 模式。
+ */
+@Slf4j
+@Component
+@RequiredArgsConstructor
+public class RagExecutor implements ConversationExecutor {
+
+    private final SearchChannelProperties searchProperties;
+    private final RetrievalEngine retrievalEngine;
+    private final LLMService llmService;
+    private final RAGPromptService promptBuilder;
+    private final IntentResolver intentResolver;
+    private final EvidenceBudgetService evidenceBudgetService;
+    private final StreamTaskManager taskManager;
+
+    @Override
+    public ExecutionMode getMode() {
+        return ExecutionMode.RAG;
+    }
+
+    @Override
+    public boolean supports(StreamChatContext ctx) {
+        // RAG 是 fallback — 总是返回 true
+        return true;
+    }
+
+    @Override
+    public void execute(StreamChatContext ctx) {
+        // 1. 检索
+        RetrievalContext retrievalCtx = retrievalEngine.retrieve(
+                ctx.getSubIntents(),
+                searchProperties.getDefaultTopK()
+        );
+
+        // 2. 空检索 / 低置信度短路
+        if (retrievalCtx.isEmpty()) {
+            ctx.getCallback().onContent(evidenceBudgetService.getNoEvidenceResponse());
+            ctx.getCallback().onComplete();
+            return;
+        }
+        if (!evidenceBudgetService.hasValidEvidence(retrievalCtx.getIntentChunks())) {
+            log.info("RAG 执行器: 证据置信度不足，短路返回");
+            ctx.getCallback().onContent(evidenceBudgetService.getNoEvidenceResponse());
+            ctx.getCallback().onComplete();
+            return;
+        }
+
+        // 3. 构建 Prompt 并流式生成
+        IntentGroup mergedGroup = intentResolver.mergeIntentGroup(ctx.getSubIntents());
+        PromptContext promptContext = PromptContext.builder()
+                .question(ctx.getRewriteResult() != null
+                        ? ctx.getRewriteResult().rewrittenQuestion()
+                        : ctx.getQuestion())
+                .mcpContext(retrievalCtx.getMcpContext())
+                .kbContext(retrievalCtx.getKbContext())
+                .mcpIntents(mergedGroup.mcpIntents())
+                .kbIntents(mergedGroup.kbIntents())
+                .intentChunks(retrievalCtx.getIntentChunks())
+                .omittedEvidenceCount(retrievalCtx.getOmittedEvidenceCount())
+                .build();
+
+        List<ChatMessage> messages = promptBuilder.buildStructuredMessages(
+                promptContext,
+                ctx.getHistory(),
+                ctx.getRewriteResult() != null
+                        ? ctx.getRewriteResult().rewrittenQuestion()
+                        : ctx.getQuestion(),
+                ctx.getRewriteResult() != null
+                        ? ctx.getRewriteResult().subQuestions()
+                        : List.of()
+        );
+
+        ChatRequest chatRequest = ChatRequest.builder()
+                .messages(messages)
+                .thinking(ctx.isDeepThinking())
+                .temperature(retrievalCtx.hasMcp() ? 0.3 : 0.0)
+                .topP(retrievalCtx.hasMcp() ? 0.8 : 1.0)
+                .build();
+
+        StreamCancellationHandle handle = llmService.streamChat(chatRequest, ctx.getCallback());
+        taskManager.bindHandle(ctx.getTaskId(), handle);
+    }
+}
