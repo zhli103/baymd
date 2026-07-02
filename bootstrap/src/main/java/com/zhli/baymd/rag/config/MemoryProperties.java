@@ -38,6 +38,11 @@ import org.springframework.validation.annotation.Validated;
 public class MemoryProperties {
 
     /**
+     * 记忆策略：none（无记忆）/ sliding_window（滑动窗口）/ summary_compression（摘要压缩）
+     */
+    private String strategy = "sliding_window";
+
+    /**
      * 保留原文的最近轮数（user+assistant 视为一轮）
      */
     @Min(1)
