@@ -61,16 +61,12 @@ jobs:
           key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
           restore-keys: ${{ runner.os }}-maven-
 
-      - name: Build with Maven (compile only, skip tests)
-        run: mvn compile -q -DskipTests
+      - name: Install dependencies (skip tests)
+        run: ./mvnw install -DskipTests -q
 
-      - name: Run unit tests
-        run: mvn test -pl framework,infra-ai -Dsurefire.failIfNoSpecifiedTests=false
-        timeout-minutes: 15
-
-      - name: Run bootstrap tests (exclude integration)
+      - name: Run all unit tests (exclude integration)
         run: |
-          mvn test -pl bootstrap \
+          ./mvnw test \
             -Dtest='!com.zhli.baymd.rag.StreamChatPipelineIntegrationTest' \
             -Dsurefire.failIfNoSpecifiedTests=false
         timeout-minutes: 15
@@ -133,9 +129,12 @@ jobs:
           key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
           restore-keys: ${{ runner.os }}-maven-
 
+      - name: Install dependencies (skip tests)
+        run: ./mvnw install -DskipTests -q
+
       - name: Run integration tests
         run: |
-          mvn test -pl bootstrap \
+          ./mvnw test -pl bootstrap \
             -Dtest='com.zhli.baymd.rag.StreamChatPipelineIntegrationTest' \
             -Dsurefire.failIfNoSpecifiedFiles=false \
             -DBAILIAN_API_KEY=${{ secrets.BAILIAN_API_KEY }}
