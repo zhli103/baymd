@@ -1,0 +1,93 @@
+# ============================================================================
+# BayMD 测试 Profile — 用于单元测试和集成测试
+# ============================================================================
+# 使用方式：
+#   @SpringBootTest
+#   @ActiveProfiles("test")
+#   class MyTest { ... }
+#
+# 或命令行：
+#   mvn test -Dspring.profiles.active=test
+# ============================================================================
+
+spring:
+  # ---------- 数据源 — 指向 Testcontainers 或 CI service container ----------
+  datasource:
+    url: jdbc:postgresql://${PG_HOST:localhost}:${PG_PORT:5432}/${PG_DB:baymd_test}
+    username: ${PG_USER:baymd}
+    password: ${PG_PASSWORD:baymd_test}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 1
+      connection-timeout: 10000
+
+  # ---------- Redis ----------
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+
+  # ---------- 禁用 RocketMQ (测试环境不需要) ----------
+  autoconfigure:
+    exclude:
+      - org.apache.rocketmq.spring.autoconfigure.RocketMQAutoConfiguration
+
+  # ---------- 日志级别 ----------
+  logging:
+    level:
+      root: WARN
+      com.zhli.baymd: INFO
+      com.zhli.baymd.rag.testbase: DEBUG
+
+# ============================================================================
+# RAG 配置
+# ============================================================================
+rag:
+  vector:
+    type: pg                       # 测试环境用 pgvector，不依赖 Milvus
+  rate-limit:
+    global: 50                     # 测试放宽限流
+  memory:
+    history-keep-turns: 10
+    summary-start-turns: 20
+
+# ============================================================================
+# AI 供应商 — 测试环境使用 Mock 或本地模型
+# ============================================================================
+ai:
+  providers:
+    mock:
+      base-url: http://localhost:19999/mock
+      api-key: mock-key-not-used
+      type: openai-compatible
+
+  chat:
+    candidates:
+      - model-name: mock-model
+        provider: mock
+        priority: 1
+        max-tokens: 4096
+
+  embedding:
+    candidates:
+      - model-name: mock-embedding
+        provider: mock
+        priority: 1
+
+  rerank:
+    candidates:
+      - model-name: mock-rerank
+        provider: mock
+        priority: 1
+
+# ============================================================================
+# 存储 — 测试环境用本地文件系统
+# ============================================================================
+storage:
+  s3:
+    endpoint: http://localhost:19000
+    region: us-east-1
+    access-key: minioadmin
+    secret-key: minioadmin
+    bucket: baymd-test

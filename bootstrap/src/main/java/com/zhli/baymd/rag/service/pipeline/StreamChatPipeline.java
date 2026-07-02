@@ -17,85 +17,56 @@
 
 package com.zhli.baymd.rag.service.pipeline;
 
-import cn.hutool.core.collection.CollUtil;
-import cn.hutool.core.util.StrUtil;
 import com.zhli.baymd.framework.convention.ChatMessage;
-import com.zhli.baymd.framework.convention.ChatRequest;
-import com.zhli.baymd.infra.chat.LLMService;
-import com.zhli.baymd.infra.chat.StreamCallback;
-import com.zhli.baymd.infra.chat.StreamCancellationHandle;
-import com.zhli.baymd.rag.core.guidance.GuidanceDecision;
-import com.zhli.baymd.rag.core.guidance.IntentGuidanceService;
 import com.zhli.baymd.rag.core.intent.IntentResolver;
 import com.zhli.baymd.rag.core.memory.ConversationMemoryService;
-import com.zhli.baymd.rag.core.prompt.PromptContext;
-import com.zhli.baymd.rag.core.prompt.PromptTemplateLoader;
-import com.zhli.baymd.rag.core.prompt.RAGPromptService;
-import com.zhli.baymd.rag.core.retrieve.RetrievalEngine;
 import com.zhli.baymd.rag.core.rewrite.QueryRewriteService;
 import com.zhli.baymd.rag.core.rewrite.RewriteResult;
-import com.zhli.baymd.rag.dto.IntentGroup;
-import com.zhli.baymd.rag.dto.RetrievalContext;
 import com.zhli.baymd.rag.dto.SubQuestionIntent;
-import com.zhli.baymd.rag.config.SearchChannelProperties;
-import com.zhli.baymd.rag.service.handler.StreamTaskManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
 import java.util.List;
-
-import static com.zhli.baymd.rag.constant.RAGConstant.CHAT_SYSTEM_PROMPT_PATH;
 
 /**
  * 流式对话流水线
  * <p>
  * 承载从 RAGChatServiceImpl 提取的业务编排逻辑：
- * 记忆加载 -> 改写拆分 -> 意图解析 -> 歧义引导 -> 系统响应 / 检索 -> Prompt 组装 -> 流式输出
+ * 记忆加载 -> 改写拆分 -> 意图解析 -> 执行器分发（Clarification / SystemOnly / RAG / Agent）
  * <p>
- * 流水线模式：通过私有方法 + boolean 返回值（handleXxx 返回 true 表示已处理并短路）
+ * 流水线模式：公共预处理阶段 → {@link ExecutorRegistry} 选择执行器 → 委托执行。
+ * 相比旧版三段 if-else，新架构支持任意新增执行模式而无需修改管道代码。
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class StreamChatPipeline {
 
-    private final SearchChannelProperties searchProperties;
     private final ConversationMemoryService memoryService;
     private final QueryRewriteService queryRewriteService;
     private final IntentResolver intentResolver;
-    private final IntentGuidanceService guidanceService;
-    private final RetrievalEngine retrievalEngine;
-    private final LLMService llmService;
-    private final RAGPromptService promptBuilder;
-    private final PromptTemplateLoader promptTemplateLoader;
-    private final StreamTaskManager taskManager;
+    private final ExecutorRegistry executorRegistry;
 
     /**
      * 执行流式对话管道
      */
     public void execute(StreamChatContext ctx) {
+        // === 公共预处理 ===
         loadMemory(ctx);
         rewriteQuery(ctx);
         resolveIntents(ctx);
 
-        if (handleGuidance(ctx)) {
-            return;
-        }
-        if (handleSystemOnly(ctx)) {
-            return;
-        }
+        // === 执行器分发 ===
+        ConversationExecutor executor = executorRegistry.resolve(ctx);
+        log.info("管道分发: mode={}, executor={}, question={}",
+                executor.getMode(), executor.getClass().getSimpleName(),
+                ctx.getQuestion().substring(0, Math.min(50, ctx.getQuestion().length())));
 
-        RetrievalContext retrievalCtx = retrieve(ctx);
-        if (handleEmptyRetrieval(ctx, retrievalCtx)) {
-            return;
-        }
-
-        streamRagResponse(ctx, retrievalCtx);
+        executor.execute(ctx);
     }
 
-    // ==================== 流水线阶段 ====================
+    // ==================== 公共预处理（保持不变） ====================
 
     private void loadMemory(StreamChatContext ctx) {
         List<ChatMessage> history = memoryService.loadAndAppend(
@@ -107,129 +78,13 @@ public class StreamChatPipeline {
     }
 
     private void rewriteQuery(StreamChatContext ctx) {
-        RewriteResult rewriteResult = queryRewriteService.rewriteWithSplit(ctx.getQuestion(), ctx.getHistory());
+        RewriteResult rewriteResult = queryRewriteService.rewriteWithSplit(
+                ctx.getQuestion(), ctx.getHistory());
         ctx.setRewriteResult(rewriteResult);
     }
 
     private void resolveIntents(StreamChatContext ctx) {
         List<SubQuestionIntent> subIntents = intentResolver.resolve(ctx.getRewriteResult());
         ctx.setSubIntents(subIntents);
-    }
-
-    private boolean handleGuidance(StreamChatContext ctx) {
-        GuidanceDecision decision = guidanceService.detectAmbiguity(
-                ctx.getRewriteResult().rewrittenQuestion(),
-                ctx.getSubIntents()
-        );
-        if (!decision.isPrompt()) {
-            return false;
-        }
-        StreamCallback callback = ctx.getCallback();
-        callback.onContent(decision.getPrompt());
-        callback.onComplete();
-        return true;
-    }
-
-    private boolean handleSystemOnly(StreamChatContext ctx) {
-        List<SubQuestionIntent> subIntents = ctx.getSubIntents();
-        boolean allSystemOnly = subIntents.stream()
-                .allMatch(si -> intentResolver.isSystemOnly(si.nodeScores()));
-        if (!allSystemOnly) {
-            return false;
-        }
-        String customPrompt = subIntents.stream()
-                .flatMap(si -> si.nodeScores().stream())
-                .map(ns -> ns.getNode().getPromptTemplate())
-                .filter(StrUtil::isNotBlank)
-                .findFirst()
-                .orElse(null);
-        StreamCancellationHandle handle = streamSystemResponse(
-                ctx.getRewriteResult().rewrittenQuestion(),
-                ctx.getHistory(),
-                customPrompt,
-                ctx.getCallback()
-        );
-        taskManager.bindHandle(ctx.getTaskId(), handle);
-        return true;
-    }
-
-    private RetrievalContext retrieve(StreamChatContext ctx) {
-        return retrievalEngine.retrieve(ctx.getSubIntents(), searchProperties.getDefaultTopK());
-    }
-
-    private boolean handleEmptyRetrieval(StreamChatContext ctx, RetrievalContext retrievalCtx) {
-        if (!retrievalCtx.isEmpty()) {
-            return false;
-        }
-        StreamCallback callback = ctx.getCallback();
-        callback.onContent("未检索到与问题相关的文档内容。");
-        callback.onComplete();
-        return true;
-    }
-
-    private void streamRagResponse(StreamChatContext ctx, RetrievalContext retrievalCtx) {
-        // 聚合所有意图用于 prompt 规划
-        IntentGroup mergedGroup = intentResolver.mergeIntentGroup(ctx.getSubIntents());
-
-        StreamCancellationHandle handle = streamLLMResponse(
-                ctx.getRewriteResult(),
-                retrievalCtx,
-                mergedGroup,
-                ctx.getHistory(),
-                ctx.isDeepThinking(),
-                ctx.getCallback()
-        );
-        taskManager.bindHandle(ctx.getTaskId(), handle);
-    }
-
-    // ==================== LLM 响应 ====================
-
-    private StreamCancellationHandle streamSystemResponse(String question, List<ChatMessage> history,
-                                                          String customPrompt, StreamCallback callback) {
-        String systemPrompt = StrUtil.isNotBlank(customPrompt)
-                ? customPrompt
-                : promptTemplateLoader.load(CHAT_SYSTEM_PROMPT_PATH);
-
-        List<ChatMessage> messages = new ArrayList<>();
-        messages.add(ChatMessage.system(systemPrompt));
-        if (CollUtil.isNotEmpty(history)) {
-            messages.addAll(history);
-        }
-        messages.add(ChatMessage.user(question));
-
-        ChatRequest req = ChatRequest.builder()
-                .messages(messages)
-                .temperature(0.7D)
-                .thinking(false)
-                .build();
-        return llmService.streamChat(req, callback);
-    }
-
-    private StreamCancellationHandle streamLLMResponse(RewriteResult rewriteResult, RetrievalContext ctx,
-                                                       IntentGroup intentGroup, List<ChatMessage> history,
-                                                       boolean deepThinking, StreamCallback callback) {
-        PromptContext promptContext = PromptContext.builder()
-                .question(rewriteResult.rewrittenQuestion())
-                .mcpContext(ctx.getMcpContext())
-                .kbContext(ctx.getKbContext())
-                .mcpIntents(intentGroup.mcpIntents())
-                .kbIntents(intentGroup.kbIntents())
-                .intentChunks(ctx.getIntentChunks())
-                .build();
-
-        List<ChatMessage> messages = promptBuilder.buildStructuredMessages(
-                promptContext,
-                history,
-                rewriteResult.rewrittenQuestion(),
-                rewriteResult.subQuestions()  // 传入子问题列表
-        );
-        ChatRequest chatRequest = ChatRequest.builder()
-                .messages(messages)
-                .thinking(deepThinking)
-                .temperature(ctx.hasMcp() ? 0.3D : 0D)  // MCP 场景稍微放宽温度
-                .topP(ctx.hasMcp() ? 0.8D : 1D)
-                .build();
-
-        return llmService.streamChat(chatRequest, callback);
     }
 }

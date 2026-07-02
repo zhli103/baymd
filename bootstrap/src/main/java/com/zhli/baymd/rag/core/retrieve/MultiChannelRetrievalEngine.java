@@ -19,7 +19,9 @@ package com.zhli.baymd.rag.core.retrieve;
 
 import cn.hutool.core.collection.CollUtil;
 import com.zhli.baymd.framework.convention.RetrievedChunk;
+import com.zhli.baymd.framework.convention.ToolGuardrails;
 import com.zhli.baymd.framework.trace.RagTraceNode;
+import com.zhli.baymd.rag.core.guardrails.GuardrailsFactory;
 import com.zhli.baymd.rag.core.retrieve.channel.SearchChannel;
 import com.zhli.baymd.rag.core.retrieve.channel.SearchChannelResult;
 import com.zhli.baymd.rag.core.retrieve.channel.SearchContext;
@@ -52,6 +54,7 @@ public class MultiChannelRetrievalEngine {
 
     private final List<SearchChannel> searchChannels;
     private final List<SearchResultPostProcessor> postProcessors;
+    private final GuardrailsFactory guardrailsFactory;
     private final Executor ragRetrievalExecutor;
 
     /**
@@ -93,12 +96,20 @@ public class MultiChannelRetrievalEngine {
         log.info("启用的检索通道：{}",
                 enabledChannels.stream().map(SearchChannel::getName).toList());
 
+        ToolGuardrails channelGuardrails = guardrailsFactory.forRetrievalChannel();
         List<CompletableFuture<SearchChannelResult>> futures = enabledChannels.stream()
                 .map(channel -> CompletableFuture.supplyAsync(
                         () -> {
                             try {
                                 log.info("执行检索通道：{}", channel.getName());
-                                return channel.search(context);
+                                return channelGuardrails.callWithFallback(
+                                        () -> channel.search(context),
+                                        SearchChannelResult.builder()
+                                                .channelType(channel.getType())
+                                                .channelName(channel.getName())
+                                                .chunks(List.of())
+                                                .build()
+                                );
                             } catch (Exception e) {
                                 log.error("检索通道 {} 执行失败", channel.getName(), e);
                                 return emptyResult(channel);

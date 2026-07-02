@@ -20,8 +20,10 @@ package com.zhli.baymd.rag.core.retrieve;
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
 import com.zhli.baymd.framework.convention.RetrievedChunk;
+import com.zhli.baymd.framework.convention.ToolGuardrails;
 import com.zhli.baymd.framework.trace.RagTraceNode;
 import com.zhli.baymd.rag.config.SearchChannelProperties;
+import com.zhli.baymd.rag.core.guardrails.GuardrailsFactory;
 import com.zhli.baymd.rag.core.intent.IntentNode;
 import com.zhli.baymd.rag.core.intent.NodeScore;
 import com.zhli.baymd.rag.core.intent.NodeScoreFilters;
@@ -29,6 +31,7 @@ import com.zhli.baymd.rag.core.mcp.McpParameterExtractor;
 import com.zhli.baymd.rag.core.mcp.McpToolExecutor;
 import com.zhli.baymd.rag.core.mcp.McpToolRegistry;
 import com.zhli.baymd.rag.core.prompt.ContextFormatter;
+import com.zhli.baymd.rag.core.prompt.EvidenceBudgetService;
 import com.zhli.baymd.rag.core.prompt.PromptTemplateLoader;
 import com.zhli.baymd.rag.dto.KbResult;
 import com.zhli.baymd.rag.dto.RetrievalContext;
@@ -67,6 +70,8 @@ public class RetrievalEngine {
     private final McpParameterExtractor mcpParameterExtractor;
     private final McpToolRegistry mcpToolRegistry;
     private final MultiChannelRetrievalEngine multiChannelRetrievalEngine;
+    private final GuardrailsFactory guardrailsFactory;
+    private final EvidenceBudgetService evidenceBudgetService;
     private final Executor ragContextExecutor;
     private final Executor mcpBatchExecutor;
 
@@ -109,6 +114,22 @@ public class RetrievalEngine {
             }
         }
 
+        // 收集所有意图分数（用于按比例分配预算）
+        List<NodeScore> allKbScores = subIntents.stream()
+                .flatMap(si -> NodeScoreFilters.kb(si.nodeScores()).stream())
+                .toList();
+
+        // 应用证据预算
+        int omittedCount = 0;
+        int evidenceTokens = 0;
+        if (CollUtil.isNotEmpty(mergedIntentChunks)) {
+            EvidenceBudgetService.BudgetResult budgetResult =
+                    evidenceBudgetService.applyBudget(mergedIntentChunks, allKbScores);
+            mergedIntentChunks = budgetResult.chunks();
+            omittedCount = budgetResult.omittedCount();
+            evidenceTokens = budgetResult.totalTokens();
+        }
+
         boolean singleQuestion = contexts.size() == 1;
         String kbContext;
         String mcpContext;
@@ -142,6 +163,8 @@ public class RetrievalEngine {
                 .mcpContext(mcpContext)
                 .kbContext(kbContext)
                 .intentChunks(mergedIntentChunks)
+                .omittedEvidenceCount(omittedCount)
+                .evidenceTokensUsed(evidenceTokens)
                 .build();
     }
 
@@ -275,8 +298,18 @@ public class RetrievalEngine {
 
         String customParamPrompt = intentNode.getParamPromptTemplate();
         Map<String, Object> params = mcpParameterExtractor.extractParameters(question, tool, customParamPrompt);
+        Map<String, Object> safeParams = params != null ? params : new HashMap<>();
 
-        return executor.execute(params != null ? params : new HashMap<>());
+        // 使用护栏包装：重试 + 超时 + 降级
+        ToolGuardrails guardrails = guardrailsFactory.forMcpTool();
+        return guardrails.callWithFallback(
+                () -> executor.execute(safeParams),
+                e -> !(e instanceof ToolGuardrails.ToolTimeoutException),
+                CallToolResult.builder()
+                        .content(List.of(new TextContent("MCP工具调用失败（已重试" + guardrails.getMaxRetries() + "次）")))
+                        .isError(true)
+                        .build()
+        );
     }
 
     private record ToolOutput(String toolId, CallToolResult result) {

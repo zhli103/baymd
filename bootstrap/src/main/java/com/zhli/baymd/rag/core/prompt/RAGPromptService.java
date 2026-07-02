@@ -49,6 +49,7 @@ import static com.zhli.baymd.rag.constant.RAGConstant.MEDICAL_KB_PROMPT_PATH;
 public class RAGPromptService {
 
     private final PromptTemplateLoader templateLoader;
+    private final EvidenceBudgetService evidenceBudgetService;
 
     /**
      * 生成系统提示词，并对模板格式做清理
@@ -226,6 +227,11 @@ public class RAGPromptService {
                 sb.append("\n\n");
             }
             sb.append(renderSection("kb-evidence", Map.of("body", context.getKbContext().trim())));
+
+            // 证据截断提示
+            if (context.getOmittedEvidenceCount() > 0) {
+                sb.append("\n").append(context.getOmittedEvidenceNote());
+            }
         }
         return sb.toString().trim();
     }

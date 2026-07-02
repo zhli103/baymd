@@ -48,6 +48,18 @@ public class RetrievalContext {
     private Map<String, List<RetrievedChunk>> intentChunks;
 
     /**
+     * 证据预算截断时被省略的文档条数（0 = 未截断）
+     */
+    @Builder.Default
+    private int omittedEvidenceCount = 0;
+
+    /**
+     * 证据预算截断后实际使用的 token 数
+     */
+    @Builder.Default
+    private int evidenceTokensUsed = 0;
+
+    /**
      * 是否存在 MCP 上下文
      */
     public boolean hasMcp() {
@@ -59,6 +71,13 @@ public class RetrievalContext {
      */
     public boolean hasKb() {
         return StrUtil.isNotBlank(kbContext);
+    }
+
+    /**
+     * 证据是否被截断
+     */
+    public boolean isEvidenceTruncated() {
+        return omittedEvidenceCount > 0;
     }
 
     /**
