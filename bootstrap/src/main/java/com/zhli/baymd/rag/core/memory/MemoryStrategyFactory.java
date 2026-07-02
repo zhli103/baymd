@@ -1,0 +1,38 @@
+package com.zhli.baymd.rag.core.memory;
+
+import com.zhli.baymd.rag.config.MemoryProperties;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Component;
+
+/**
+ * 记忆策略工厂 — 根据配置创建对应的 MemoryStrategy 实例。
+ */
+@Slf4j
+@Component
+@RequiredArgsConstructor
+public class MemoryStrategyFactory {
+
+    private final ConversationMemoryStore store;
+    private final ConversationMemorySummaryService summaryService;
+    private final MemoryProperties props;
+
+    public MemoryStrategy create() {
+        String name = props.getStrategy() != null ? props.getStrategy().trim().toLowerCase() : "sliding_window";
+        return switch (name) {
+            case "none" -> {
+                log.info("记忆策略: 无记忆");
+                yield new MemoryStrategies.NoMemory();
+            }
+            case "summary_compression", "summary" -> {
+                log.info("记忆策略: 摘要压缩 (窗口={}轮, 摘要起始={}轮)",
+                        props.getHistoryKeepTurns(), props.getSummaryStartTurns());
+                yield new MemoryStrategies.SummaryCompression(store, summaryService, props);
+            }
+            default -> {
+                log.info("记忆策略: 滑动窗口 ({}轮)", props.getHistoryKeepTurns());
+                yield new MemoryStrategies.SlidingWindow(store, props);
+            }
+        };
+    }
+}

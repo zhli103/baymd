@@ -35,45 +35,33 @@ public class DefaultConversationMemoryService implements ConversationMemoryServi
 
     private final ConversationMemoryStore memoryStore;
     private final ConversationMemorySummaryService summaryService;
+    private final MemoryStrategyFactory strategyFactory;
     private final Executor memoryLoadExecutor;
 
     public DefaultConversationMemoryService(ConversationMemoryStore memoryStore,
                                             ConversationMemorySummaryService summaryService,
+                                            MemoryStrategyFactory strategyFactory,
                                             Executor memoryLoadExecutor) {
         this.memoryStore = memoryStore;
         this.summaryService = summaryService;
+        this.strategyFactory = strategyFactory;
         this.memoryLoadExecutor = memoryLoadExecutor;
     }
 
     @Override
     public List<ChatMessage> load(String conversationId, String userId) {
-        // 参数校验
         if (StrUtil.isBlank(conversationId) || StrUtil.isBlank(userId)) {
             return List.of();
         }
-
         long startTime = System.currentTimeMillis();
         try {
-            // 并行加载摘要和历史记录
-            CompletableFuture<ChatMessage> summaryFuture = CompletableFuture.supplyAsync(
-                    () -> loadSummaryWithFallback(conversationId, userId), memoryLoadExecutor
-            );
-            CompletableFuture<List<ChatMessage>> historyFuture = CompletableFuture.supplyAsync(
-                    () -> loadHistoryWithFallback(conversationId, userId), memoryLoadExecutor
-            );
-
-            // 等待所有任务完成后合并结果
-            return CompletableFuture.allOf(summaryFuture, historyFuture)
-                    .thenApply(v -> {
-                        ChatMessage summary = summaryFuture.join();
-                        List<ChatMessage> history = historyFuture.join();
-                        log.debug("加载对话记忆 - conversationId: {}, userId: {}, 摘要: {}, 历史消息数: {}, 耗时: {}ms",
-                                conversationId, userId, summary != null, history.size(), System.currentTimeMillis() - startTime);
-                        return attachSummary(summary, history);
-                    })
-                    .join();
+            MemoryStrategy strategy = strategyFactory.create();
+            List<ChatMessage> history = strategy.loadHistory(conversationId, userId, null);
+            log.debug("记忆加载: strategy={}, {}ms, {}条",
+                    strategy.getName(), System.currentTimeMillis() - startTime, history.size());
+            return history != null ? history : List.of();
         } catch (Exception e) {
-            log.error("加载对话记忆失败 - conversationId: {}, userId: {}", conversationId, userId, e);
+            log.error("加载对话记忆失败: convId={}", conversationId, e);
             return List.of();
         }
     }
