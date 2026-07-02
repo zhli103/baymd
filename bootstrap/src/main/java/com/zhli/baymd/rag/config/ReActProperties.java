@@ -18,6 +18,9 @@ import org.springframework.stereotype.Component;
 @ConfigurationProperties(prefix = "rag.react")
 public class ReActProperties {
 
+    /** 是否启用 Agent 模式（关闭时走传统 RAG） */
+    private boolean enabled = false;
+
     /** ReAct 循环最大迭代次数 */
     private int maxIterations = 10;
 
