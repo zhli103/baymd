@@ -53,6 +53,7 @@ public class MultiQuestionRewriteService implements QueryRewriteService {
     private final RAGConfigProperties ragConfigProperties;
     private final QueryTermMappingService queryTermMappingService;
     private final PromptTemplateLoader promptTemplateLoader;
+    private final DecompositionQualityService qualityService;
 
     @Override
     @RagTraceNode(name = "query-rewrite", type = "REWRITE")
@@ -108,14 +109,29 @@ public class MultiQuestionRewriteService implements QueryRewriteService {
             RewriteResult parsed = parseRewriteAndSplit(raw);
 
             if (parsed != null) {
+                // 质量评估和优化
+                List<String> refinedSubs = qualityService.refine(
+                        parsed.subQuestions(), parsed.rewrittenQuestion());
+                double quality = qualityService.evaluateQuality(
+                        refinedSubs, normalizedQuestion);
+
+                if (quality < 0.3) {
+                    log.warn("子问题拆分质量过低 ({}), 回退到原问题: question={}",
+                            String.format("%.2f", quality), normalizedQuestion);
+                    return new RewriteResult(normalizedQuestion, List.of(normalizedQuestion));
+                }
+
+                RewriteResult result = new RewriteResult(parsed.rewrittenQuestion(), refinedSubs);
                 log.info("""
                         RAG用户问题查询改写+拆分：
                         原始问题：{}
                         归一化后：{}
                         改写结果：{}
-                        子问题：{}
-                        """, originalQuestion, normalizedQuestion, parsed.rewrittenQuestion(), parsed.subQuestions());
-                return parsed;
+                        子问题：{} (质量: {})
+                        """, originalQuestion, normalizedQuestion,
+                        result.rewrittenQuestion(), result.subQuestions(),
+                        String.format("%.2f", quality));
+                return result;
             }
 
             log.warn("查询改写+拆分解析失败，使用归一化问题兜底 - normalizedQuestion={}", normalizedQuestion);
