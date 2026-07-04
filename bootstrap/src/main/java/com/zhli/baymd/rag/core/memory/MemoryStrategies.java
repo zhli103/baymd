@@ -3,6 +3,8 @@ package com.zhli.baymd.rag.core.memory;
 import cn.hutool.core.collection.CollUtil;
 import com.zhli.baymd.framework.convention.ChatMessage;
 import com.zhli.baymd.rag.config.MemoryProperties;
+import com.zhli.baymd.rag.core.memory.retrieve.MemoryInjector;
+import com.zhli.baymd.rag.core.memory.retrieve.MemoryRetrievalService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -86,6 +88,35 @@ public final class MemoryStrategies {
                 log.debug("摘要压缩记忆: {} 条 (未触发摘要, 总{}条)", result.size(), all.size());
             }
             return result;
+        }
+    }
+
+    // ==================== 语义记忆 ====================
+
+    /** 语义记忆：从历史对话中提取结构化事实，用向量检索召回相关记忆注入 Prompt。 */
+    @RequiredArgsConstructor
+    public static class SemanticMemory implements MemoryStrategy {
+        private final MemoryRetrievalService retrievalService;
+        private final MemoryInjector injector;
+
+        @Override public String getName() { return "semantic"; }
+        @Override public boolean isEnabled() { return true; }
+        @Override
+        public List<ChatMessage> loadHistory(String conversationId, String userId, ChatMessage currentMessage) {
+            // 用当前用户问题检索相关记忆
+            String question = currentMessage != null ? currentMessage.getContent() : "";
+            if (question.isBlank()) return List.of();
+
+            var memory = retrievalService.retrieve(question, userId);
+            if (memory.isEmpty()) return List.of();
+
+            String prompt = injector.buildPromptFragment(memory);
+            if (prompt.isBlank()) return List.of();
+
+            log.debug("语义记忆: userId={}, facts={}, episodes={}",
+                    userId, memory.getFacts().size(), memory.getEpisodes().size());
+
+            return List.of(ChatMessage.system(prompt));
         }
     }
 }

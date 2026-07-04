@@ -5,6 +5,7 @@ import com.zhli.baymd.infra.chat.StreamCallback;
 import com.zhli.baymd.rag.core.eval.QualityEvaluator;
 import com.zhli.baymd.rag.core.followup.CitationCollector;
 import com.zhli.baymd.rag.core.followup.FollowUpGenerator;
+import com.zhli.baymd.rag.core.memory.extract.MemoryExtractionOrchestrator;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.List;
@@ -19,19 +20,28 @@ public class EnrichedStreamCallback implements StreamCallback {
     private final StreamCallback delegate;
     private final FollowUpGenerator followUpGenerator;
     private final QualityEvaluator qualityEvaluator;
+    private final MemoryExtractionOrchestrator memoryOrchestrator;
     private final String question;
+    private final String userId;
+    private final String conversationId;
     private final Map<String, List<RetrievedChunk>> intentChunks;
     private final StringBuilder answer = new StringBuilder();
 
     public EnrichedStreamCallback(StreamCallback delegate,
                                    FollowUpGenerator followUpGenerator,
                                    QualityEvaluator qualityEvaluator,
+                                   MemoryExtractionOrchestrator memoryOrchestrator,
                                    String question,
+                                   String userId,
+                                   String conversationId,
                                    Map<String, List<RetrievedChunk>> intentChunks) {
         this.delegate = delegate;
         this.followUpGenerator = followUpGenerator;
         this.qualityEvaluator = qualityEvaluator;
+        this.memoryOrchestrator = memoryOrchestrator;
         this.question = question;
+        this.userId = userId;
+        this.conversationId = conversationId;
         this.intentChunks = intentChunks;
     }
 
@@ -71,8 +81,12 @@ public class EnrichedStreamCallback implements StreamCallback {
                     .thenAccept(score -> log.info("质量评估完成: {}", score.toSummary()));
         }
 
-        // 4. 先发送引用和追问为独立的 SSE 事件
-        // 然后委托原 onComplete（发送 FINISH + DONE）
+        // 4. 异步记忆提取（提取 Fact + Episode，不阻塞响应）
+        if (memoryOrchestrator != null && !answerText.isBlank()) {
+            memoryOrchestrator.extractAsync(question, answerText, userId, conversationId, null);
+        }
+
+        // 5. 委托原 onComplete（发送 FINISH + DONE）
         delegate.onComplete();
     }
 
