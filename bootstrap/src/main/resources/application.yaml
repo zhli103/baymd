@@ -43,6 +43,10 @@ milvus:
   uri: http://localhost:19530
 
 rag:
+  react:
+    enabled: true       # Agent 模式开关
+    max-iterations: 5   # ReAct 最大迭代次数
+
   vector:
     type: pg  # 可选 milvus / pg
 
@@ -64,6 +68,7 @@ rag:
       poll-interval-ms: 200
 
   memory:
+    strategy: sliding_window
     history-keep-turns: 4
     summary-start-turns: 5
     summary-enabled: true
@@ -110,7 +115,7 @@ ai:
 #        chat: /v1/chat/completions
 #        embedding: /v1/embeddings
     bailian:
-      url: https://dashscope-intl.aliyuncs.com
+      url: https://dashscope-intl.aliyuncs.com/
       api-key: ${BAILIAN_API_KEY:}
       endpoints:
         chat: /compatible-mode/v1/chat/completions
@@ -137,13 +142,14 @@ ai:
     message-chunk-size: 1
 
   chat:
-    default-model: qwen3.5-flash
-    deep-thinking-model: qwen3.5-flash
+    default-model: qwen3.6-plus
+    deep-thinking-model: qwen3.6-plus
     candidates:
-      - id: qwen3.5-flash
+      - id: qwen3.6-plus
         provider: bailian
-        model: qwen3.5-flash
+        model: qwen3.6-plus
         priority: 1
+        supports-thinking: true
 
   embedding:
     default-model: text-embedding-v4
