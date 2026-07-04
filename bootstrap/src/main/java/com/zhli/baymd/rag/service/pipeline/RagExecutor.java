@@ -8,6 +8,7 @@ import com.zhli.baymd.infra.chat.StreamCancellationHandle;
 import com.zhli.baymd.rag.config.SearchChannelProperties;
 import com.zhli.baymd.rag.core.eval.QualityEvaluator;
 import com.zhli.baymd.rag.core.followup.FollowUpGenerator;
+import com.zhli.baymd.rag.core.memory.extract.MemoryExtractionOrchestrator;
 import com.zhli.baymd.rag.core.intent.IntentResolver;
 import com.zhli.baymd.rag.core.prompt.EvidenceBudgetService;
 import com.zhli.baymd.rag.core.prompt.PromptContext;
@@ -40,6 +41,7 @@ public class RagExecutor implements ConversationExecutor {
     private final StreamTaskManager taskManager;
     private final FollowUpGenerator followUpGenerator;
     private final QualityEvaluator qualityEvaluator;
+    private final MemoryExtractionOrchestrator memoryOrchestrator;
 
     @Override
     public ExecutionMode getMode() {
@@ -111,7 +113,9 @@ public class RagExecutor implements ConversationExecutor {
                 : ctx.getQuestion();
         StreamCallback enriched = new EnrichedStreamCallback(
                 ctx.getCallback(), followUpGenerator, qualityEvaluator,
-                question, retrievalCtx.getIntentChunks());
+                memoryOrchestrator,
+                question, ctx.getUserId(), ctx.getConversationId(),
+                retrievalCtx.getIntentChunks());
 
         StreamCancellationHandle handle = llmService.streamChat(chatRequest, enriched);
         taskManager.bindHandle(ctx.getTaskId(), handle);

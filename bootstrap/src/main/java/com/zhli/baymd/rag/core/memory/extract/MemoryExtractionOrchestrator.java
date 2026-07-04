@@ -1,0 +1,88 @@
+package com.zhli.baymd.rag.core.memory.extract;
+
+import com.zhli.baymd.infra.embedding.EmbeddingService;
+import com.zhli.baymd.rag.dao.entity.UserEpisodeDO;
+import com.zhli.baymd.rag.dao.entity.UserFactDO;
+import com.zhli.baymd.rag.dao.mapper.UserEpisodeVectorMapper;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
+
+/**
+ * 记忆提取编排器 — 异步编排 Fact 和 Episode 的提取、向量化、入库。
+ */
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class MemoryExtractionOrchestrator {
+
+    private final FactExtractionService factService;
+    private final EpisodeExtractionService episodeService;
+    private final EmbeddingService embeddingService;
+    private final UserEpisodeVectorMapper episodeVectorMapper;
+
+    /**
+     * 异步提取记忆（不阻塞用户响应）。
+     */
+    public void extractAsync(String question, String answer,
+                              String userId, String conversationId, String messageId) {
+        CompletableFuture.runAsync(() -> {
+            try {
+                // 并行提取 Facts 和 Episode
+                CompletableFuture<List<UserFactDO>> factsFuture =
+                        CompletableFuture.supplyAsync(() ->
+                                factService.extractAndSave(question, answer, userId, messageId));
+                CompletableFuture<UserEpisodeDO> episodeFuture =
+                        CompletableFuture.supplyAsync(() ->
+                                episodeService.extractAndSave(question, answer, userId, conversationId));
+
+                List<UserFactDO> facts = factsFuture.join();
+                UserEpisodeDO episode = episodeFuture.join();
+
+                // 向量化并写入
+                embedFactsAsync(facts);
+                embedEpisodeAsync(episode);
+
+                log.info("记忆提取完成: userId={}, facts={}, episode={}",
+                        userId, facts.size(), episode != null ? 1 : 0);
+            } catch (Exception e) {
+                log.warn("记忆提取失败: userId={}", userId, e);
+            }
+        });
+    }
+
+    private void embedFactsAsync(List<UserFactDO> facts) {
+        if (facts.isEmpty()) return;
+        CompletableFuture.runAsync(() -> {
+            for (UserFactDO fact : facts) {
+                try {
+                    List<Float> vec = embeddingService.embed(fact.getFactText());
+                    String vecStr = vec.stream().map(String::valueOf)
+                            .collect(Collectors.joining(",", "[", "]"));
+                    factService.embedFact(fact, vecStr);
+                } catch (Exception e) {
+                    log.warn("Fact 向量化失败: factId={}", fact.getId(), e);
+                }
+            }
+        });
+    }
+
+    private void embedEpisodeAsync(UserEpisodeDO episode) {
+        if (episode == null) return;
+        CompletableFuture.runAsync(() -> {
+            try {
+                String text = episode.getTitle() + " " + episode.getSummary();
+                List<Float> vec = embeddingService.embed(text);
+                String vecStr = vec.stream().map(String::valueOf)
+                        .collect(Collectors.joining(",", "[", "]"));
+                episodeVectorMapper.insert(episode.getId(), vecStr);
+            } catch (Exception e) {
+                log.warn("Episode 向量化失败: epId={}", episode.getId(), e);
+            }
+        });
+    }
+}

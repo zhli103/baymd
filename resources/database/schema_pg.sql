@@ -722,3 +722,46 @@ COMMENT ON COLUMN t_ingestion_task_node.output_json IS '节点输出JSON(全量)
 COMMENT ON COLUMN t_ingestion_task_node.create_time IS '创建时间';
 COMMENT ON COLUMN t_ingestion_task_node.update_time IS '更新时间';
 COMMENT ON COLUMN t_ingestion_task_node.deleted IS '是否删除 0：正常 1：删除';
+
+-- ============================================================
+-- 用户记忆表（语义记忆系统 - 借鉴 EverOS）
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS t_user_fact (
+    id            VARCHAR(64) PRIMARY KEY,
+    user_id       VARCHAR(64) NOT NULL,
+    fact_type     VARCHAR(32) NOT NULL,
+    fact_text     TEXT NOT NULL,
+    confidence    FLOAT DEFAULT 1.0,
+    source_msg_id VARCHAR(64),
+    content_hash  VARCHAR(64),
+    created_at    TIMESTAMP DEFAULT NOW(),
+    updated_at    TIMESTAMP DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_user_fact_user ON t_user_fact(user_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_user_fact_hash ON t_user_fact(user_id, content_hash);
+
+CREATE TABLE IF NOT EXISTS t_user_fact_vector (
+    id        VARCHAR(64) PRIMARY KEY REFERENCES t_user_fact(id) ON DELETE CASCADE,
+    embedding vector(1536)
+);
+CREATE INDEX IF NOT EXISTS idx_fact_vec_hnsw ON t_user_fact_vector
+    USING hnsw (embedding vector_cosine_ops);
+
+CREATE TABLE IF NOT EXISTS t_user_episode (
+    id              VARCHAR(64) PRIMARY KEY,
+    user_id         VARCHAR(64) NOT NULL,
+    conversation_id VARCHAR(64) NOT NULL,
+    title           VARCHAR(256),
+    summary         TEXT,
+    topics          TEXT[],
+    created_at      TIMESTAMP DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_user_episode_user ON t_user_episode(user_id, created_at);
+
+CREATE TABLE IF NOT EXISTS t_user_episode_vector (
+    id        VARCHAR(64) PRIMARY KEY REFERENCES t_user_episode(id) ON DELETE CASCADE,
+    embedding vector(1536)
+);
+CREATE INDEX IF NOT EXISTS idx_ep_vec_hnsw ON t_user_episode_vector
+    USING hnsw (embedding vector_cosine_ops);
