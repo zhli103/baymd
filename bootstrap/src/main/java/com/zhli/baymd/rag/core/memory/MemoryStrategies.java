@@ -3,6 +3,7 @@ package com.zhli.baymd.rag.core.memory;
 import cn.hutool.core.collection.CollUtil;
 import com.zhli.baymd.framework.convention.ChatMessage;
 import com.zhli.baymd.rag.config.MemoryProperties;
+import com.zhli.baymd.rag.core.memory.evolution.ProfileGenerationService;
 import com.zhli.baymd.rag.core.memory.retrieve.MemoryInjector;
 import com.zhli.baymd.rag.core.memory.retrieve.MemoryRetrievalService;
 import lombok.RequiredArgsConstructor;
@@ -98,25 +99,36 @@ public final class MemoryStrategies {
     public static class SemanticMemory implements MemoryStrategy {
         private final MemoryRetrievalService retrievalService;
         private final MemoryInjector injector;
+        private final ProfileGenerationService profileService;
 
         @Override public String getName() { return "semantic"; }
         @Override public boolean isEnabled() { return true; }
         @Override
         public List<ChatMessage> loadHistory(String conversationId, String userId, ChatMessage currentMessage) {
-            // 用当前用户问题检索相关记忆
             String question = currentMessage != null ? currentMessage.getContent() : "";
             if (question.isBlank()) return List.of();
 
+            List<ChatMessage> result = new ArrayList<>();
+
+            // 1. 尝试加载用户画像（累积30+ Fact后生成）
+            var profile = profileService.generateIfNeeded(userId);
+            if (profile != null) {
+                result.add(ChatMessage.system(profile.toPromptFragment()));
+            }
+
+            // 2. 语义检索相关 Facts + Episodes
             var memory = retrievalService.retrieve(question, userId);
-            if (memory.isEmpty()) return List.of();
+            if (!memory.isEmpty()) {
+                String prompt = injector.buildPromptFragment(memory);
+                if (!prompt.isBlank()) {
+                    result.add(ChatMessage.system(prompt));
+                }
+            }
 
-            String prompt = injector.buildPromptFragment(memory);
-            if (prompt.isBlank()) return List.of();
+            log.debug("语义记忆: userId={}, profile={}, facts={}, episodes={}",
+                    userId, profile != null, memory.getFacts().size(), memory.getEpisodes().size());
 
-            log.debug("语义记忆: userId={}, facts={}, episodes={}",
-                    userId, memory.getFacts().size(), memory.getEpisodes().size());
-
-            return List.of(ChatMessage.system(prompt));
+            return result;
         }
     }
 }
