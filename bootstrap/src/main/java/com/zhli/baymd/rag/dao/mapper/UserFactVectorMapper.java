@@ -28,6 +28,9 @@ public interface UserFactVectorMapper {
                                           @Param("limit") int limit);
 
     /** 删除指定 user_id 的所有向量 */
+    @org.apache.ibatis.annotations.Delete("DELETE FROM t_user_fact_vector WHERE id = #{id}")
+    void deleteById(@Param("id") String id);
+
     @org.apache.ibatis.annotations.Delete(
             "DELETE FROM t_user_fact_vector WHERE id IN (SELECT id FROM t_user_fact WHERE user_id = #{userId})")
     void deleteByUserId(@Param("userId") String userId);
