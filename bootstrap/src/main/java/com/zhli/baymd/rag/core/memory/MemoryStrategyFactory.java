@@ -1,6 +1,7 @@
 package com.zhli.baymd.rag.core.memory;
 
 import com.zhli.baymd.rag.config.MemoryProperties;
+import com.zhli.baymd.rag.core.memory.evolution.ProfileGenerationService;
 import com.zhli.baymd.rag.core.memory.retrieve.MemoryInjector;
 import com.zhli.baymd.rag.core.memory.retrieve.MemoryRetrievalService;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +20,7 @@ public class MemoryStrategyFactory {
     private final ConversationMemorySummaryService summaryService;
     private final MemoryRetrievalService retrievalService;
     private final MemoryInjector memoryInjector;
+    private final ProfileGenerationService profileService;
     private final MemoryProperties props;
 
     public MemoryStrategy create() {
@@ -33,8 +35,8 @@ public class MemoryStrategyFactory {
                 yield new MemoryStrategies.SummaryCompression(store, summaryService, props);
             }
             case "semantic" -> {
-                log.info("记忆策略: 语义记忆 (向量检索 + Facts/Episodes)");
-                yield new MemoryStrategies.SemanticMemory(retrievalService, memoryInjector);
+                log.info("记忆策略: 语义记忆 (向量检索 + Facts/Episodes/画像)");
+                yield new MemoryStrategies.SemanticMemory(retrievalService, memoryInjector, profileService);
             }
             default -> {
                 log.info("记忆策略: 滑动窗口 ({}轮)", props.getHistoryKeepTurns());

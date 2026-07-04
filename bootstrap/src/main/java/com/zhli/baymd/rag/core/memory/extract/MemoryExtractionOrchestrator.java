@@ -1,6 +1,8 @@
 package com.zhli.baymd.rag.core.memory.extract;
 
 import com.zhli.baymd.infra.embedding.EmbeddingService;
+import com.zhli.baymd.rag.core.memory.evolution.FactMergingService;
+import com.zhli.baymd.rag.core.memory.evolution.ProfileGenerationService;
 import com.zhli.baymd.rag.dao.entity.UserEpisodeDO;
 import com.zhli.baymd.rag.dao.entity.UserFactDO;
 import com.zhli.baymd.rag.dao.mapper.UserEpisodeVectorMapper;
@@ -24,6 +26,8 @@ public class MemoryExtractionOrchestrator {
     private final EpisodeExtractionService episodeService;
     private final EmbeddingService embeddingService;
     private final UserEpisodeVectorMapper episodeVectorMapper;
+    private final FactMergingService factMergingService;
+    private final ProfileGenerationService profileService;
 
     /**
      * 异步提取记忆（不阻塞用户响应）。
@@ -46,6 +50,10 @@ public class MemoryExtractionOrchestrator {
                 // 向量化并写入
                 embedFactsAsync(facts);
                 embedEpisodeAsync(episode);
+
+                // 触发进化：合并+画像
+                factMergingService.mergeIfNeeded(userId);
+                profileService.generateIfNeeded(userId);
 
                 log.info("记忆提取完成: userId={}, facts={}, episode={}",
                         userId, facts.size(), episode != null ? 1 : 0);
