@@ -1,5 +1,6 @@
 package com.zhli.baymd.rag.dao.mapper;
 
+import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -21,6 +22,13 @@ public interface UserEpisodeVectorMapper {
     List<EpisodeVectorResult> searchSimilar(@Param("userId") String userId,
                                              @Param("embedding") String embedding,
                                              @Param("limit") int limit);
+
+    @Delete("DELETE FROM t_user_episode_vector WHERE id = #{id}")
+    void deleteById(@Param("id") String id);
+
+    @Delete("DELETE FROM t_user_episode_vector WHERE id IN "
+            + "(SELECT id FROM t_user_episode WHERE user_id = #{userId})")
+    void deleteByUserId(@Param("userId") String userId);
 
     record EpisodeVectorResult(String id, String title, String summary, Double similarity) {}
 }

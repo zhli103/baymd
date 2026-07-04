@@ -18,6 +18,7 @@
 package com.zhli.baymd.rag.mq;
 
 import com.zhli.baymd.framework.mq.MessageWrapper;
+import com.zhli.baymd.rag.core.memory.feedback.FeedbackFactService;
 import com.zhli.baymd.rag.mq.event.MessageFeedbackEvent;
 import com.zhli.baymd.rag.service.MessageFeedbackService;
 import lombok.RequiredArgsConstructor;
@@ -39,6 +40,7 @@ import org.springframework.stereotype.Component;
 public class MessageFeedbackConsumer implements RocketMQListener<MessageWrapper<MessageFeedbackEvent>> {
 
     private final MessageFeedbackService feedbackService;
+    private final FeedbackFactService feedbackFactService;
 
     @Override
     public void onMessage(MessageWrapper<MessageFeedbackEvent> message) {
@@ -47,5 +49,14 @@ public class MessageFeedbackConsumer implements RocketMQListener<MessageWrapper<
         log.info("[消费者] 开始处理点赞/点踩事件，messageId: {}, userId: {}, vote: {}, keys: {}",
                 event.getMessageId(), event.getUserId(), event.getVote(), message.getKeys());
         feedbackService.submitFeedbackByEvent(event);
+
+        // 反馈联动：点赞提升 Fact 置信度，点踩降级
+        if (event.getVote() != null) {
+            if (event.getVote() < 0) {
+                feedbackFactService.onDislike(event.getMessageId(), event.getUserId());
+            } else if (event.getVote() > 0) {
+                feedbackFactService.onLike(event.getMessageId(), event.getUserId());
+            }
+        }
     }
 }

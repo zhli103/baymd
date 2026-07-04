@@ -23,18 +23,19 @@ import com.zhli.baymd.rag.controller.vo.ConversationVO;
 import com.zhli.baymd.framework.context.UserContext;
 import com.zhli.baymd.framework.convention.Result;
 import com.zhli.baymd.framework.web.Results;
+import com.zhli.baymd.rag.dao.mapper.UserEpisodeMapper;
+import com.zhli.baymd.rag.dao.mapper.UserEpisodeVectorMapper;
+import com.zhli.baymd.rag.dao.mapper.UserFactMapper;
+import com.zhli.baymd.rag.dao.mapper.UserFactVectorMapper;
 import com.zhli.baymd.rag.enums.ConversationMessageOrder;
 import com.zhli.baymd.rag.service.ConversationMessageService;
 import com.zhli.baymd.rag.service.ConversationService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 会话控制器
@@ -46,6 +47,10 @@ public class ConversationController {
 
     private final ConversationService conversationService;
     private final ConversationMessageService conversationMessageService;
+    private final UserFactMapper userFactMapper;
+    private final UserFactVectorMapper userFactVectorMapper;
+    private final UserEpisodeMapper userEpisodeMapper;
+    private final UserEpisodeVectorMapper userEpisodeVectorMapper;
 
     /**
      * 获取会话列表
@@ -80,5 +85,59 @@ public class ConversationController {
     @GetMapping("/conversations/{conversationId}/messages")
     public Result<List<ConversationMessageVO>> listMessages(@PathVariable String conversationId) {
         return Results.success(conversationMessageService.listMessages(conversationId, UserContext.getUserId(), null, ConversationMessageOrder.ASC));
+    }
+
+    /**
+     * 导出会话为 JSON 格式（含消息 + 元数据）
+     */
+    @GetMapping("/conversations/{conversationId}/export")
+    public Result<Map<String, Object>> exportConversation(@PathVariable String conversationId) {
+        String userId = UserContext.getUserId();
+        List<ConversationMessageVO> messages = conversationMessageService.listMessages(
+                conversationId, userId, null, ConversationMessageOrder.ASC);
+        Map<String, Object> export = new LinkedHashMap<>();
+        export.put("conversationId", conversationId);
+        export.put("userId", userId);
+        export.put("exportedAt", java.time.Instant.now().toString());
+        export.put("messageCount", messages.size());
+        export.put("messages", messages);
+        return Results.success(export);
+    }
+
+    /**
+     * 清空当前用户所有记忆数据（Facts + Episodes + 向量）
+     */
+    @DeleteMapping("/memory")
+    public Result<Map<String, Object>> clearMemory() {
+        String userId = UserContext.getUserId();
+        int facts = clearFacts(userId);
+        int episodes = clearEpisodes(userId);
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("userId", userId);
+        result.put("deletedFacts", facts);
+        result.put("deletedEpisodes", episodes);
+        return Results.success(result);
+    }
+
+    private int clearFacts(String userId) {
+        var facts = userFactMapper.selectList(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.zhli.baymd.rag.dao.entity.UserFactDO>()
+                        .eq(com.zhli.baymd.rag.dao.entity.UserFactDO::getUserId, userId));
+        if (!facts.isEmpty()) {
+            userFactVectorMapper.deleteByUserId(userId);
+            userFactMapper.deleteBatchIds(facts.stream().map(f -> f.getId()).toList());
+        }
+        return facts.size();
+    }
+
+    private int clearEpisodes(String userId) {
+        var episodes = userEpisodeMapper.selectList(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.zhli.baymd.rag.dao.entity.UserEpisodeDO>()
+                        .eq(com.zhli.baymd.rag.dao.entity.UserEpisodeDO::getUserId, userId));
+        if (!episodes.isEmpty()) {
+            userEpisodeVectorMapper.deleteByUserId(userId);
+            userEpisodeMapper.deleteBatchIds(episodes.stream().map(e -> e.getId()).toList());
+        }
+        return episodes.size();
     }
 }
